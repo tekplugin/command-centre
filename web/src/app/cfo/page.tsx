@@ -1,0 +1,2189 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import DashboardLayout from '@/components/DashboardLayout';
+
+/**
+ * IMPORTANT UI VISIBILITY RULE:
+ * 
+ * Always add explicit text color classes to ALL text elements (<p>, <span>, <div>, etc.)
+ * to ensure proper contrast and visibility.
+ * 
+ * Common color classes:
+ * - text-gray-900 (dark text for primary content)
+ * - text-gray-700 (medium dark for secondary content)
+ * - text-gray-600 (medium for labels)
+ * - text-gray-500 (light for hints/helper text)
+ * - text-red-600 (for deductions/negative values)
+ * - text-green-600 (for positive values/net pay)
+ * - text-blue-900 (for summary panels with blue backgrounds)
+ * 
+ * NEVER rely on default text colors - always specify explicitly!
+ * Add 'block' class to span elements when needed for proper display.
+ */
+
+export default function FinancePage() {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showInvoiceDetailsModal, setShowInvoiceDetailsModal] = useState(false);
+  const [showPayrollModal, setShowPayrollModal] = useState(false);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  
+  // HR Employee Data (shared across the app)
+  const [hrEmployees] = useState<any[]>([
+    { id: '1', name: 'Chidi Okonkwo', employeeId: 'EMP-001', role: 'Senior Engineer', department: 'Operations', status: 'active', email: 'chidi@company.com', type: 'permanent' },
+    { id: '2', name: 'Amina Yusuf', employeeId: 'EMP-002', role: 'Software Engineer', department: 'Technology', status: 'active', email: 'amina@company.com', type: 'permanent' },
+    { id: '3', name: 'Oluwaseun Adeyemi', employeeId: 'EMP-003', role: 'Field Engineer', department: 'Operations', status: 'active', email: 'seun@company.com', type: 'contract' },
+    { id: '4', name: 'Ngozi Eze', employeeId: 'EMP-004', role: 'Sales Manager', department: 'Sales', status: 'active', email: 'ngozi@company.com', type: 'permanent' },
+    { id: '5', name: 'Ibrahim Musa', employeeId: 'EMP-005', role: 'Junior Engineer', department: 'Operations', status: 'active', email: 'ibrahim@company.com', type: 'contract' },
+    { id: '6', name: 'Blessing Nwosu', employeeId: 'EMP-006', role: 'Field Technician', department: 'Operations', status: 'active', email: 'blessing@company.com', type: 'contract' },
+    { id: '7', name: 'Yusuf Abdullahi', employeeId: 'EMP-007', role: 'Field Engineer', department: 'Operations', status: 'active', email: 'yusuf@company.com', type: 'contract' },
+  ]);
+  
+  const [payrollEmployees, setPayrollEmployees] = useState<any[]>([
+    {
+      id: Date.now(),
+      employeeType: 'permanent', // 'permanent' or 'contract'
+      employeeName: '',
+      employeeId: '',
+      jobTitle: '',
+      annualGross: '',
+      basicPercent: 15,
+      transportPercent: 15,
+      housingPercent: 15,
+      othersPercent: 55,
+      // Contract staff fields
+      atmCount: '0',
+      ratePerAtm: '0',
+      // Common deductions
+      hmo: '0',
+      hmoCompany: '0',
+      loan: '0',
+      penalty: '0',
+    }
+  ]);
+  const [emailData, setEmailData] = useState({
+    to: '',
+    subject: '',
+    message: '',
+  });
+  const [formData, setFormData] = useState({
+    type: 'expense' as 'expense',
+    category: '',
+    amount: '',
+    description: '',
+    date: '',
+  });
+  const [invoiceData, setInvoiceData] = useState({
+    client: '',
+    invoiceNumber: '',
+    category: '',
+    issueDate: '',
+    dueDate: '',
+    items: [{ description: '', quantity: 1, rate: '', amount: '' }],
+    vat: 7.5,
+    notes: '',
+    initialPayment: '',
+    initialPaymentDate: '',
+    balancePaymentDate: '',
+  });
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [accountsReceivable, setAccountsReceivable] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [revenues, setRevenues] = useState<any[]>([]);
+  const [lastBalance, setLastBalance] = useState<number>(0);
+  const [currentBalance, setCurrentBalance] = useState<number>(0);
+  const [bankAccount, setBankAccount] = useState<string>('0123456789');
+  const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
+  const [exchangeRate, setExchangeRate] = useState<number>(1550); // NGN to USD rate
+
+  // Fetch current exchange rate from API
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      try {
+        // Using a free exchange rate API (you can replace with your preferred provider)
+        const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+        const data = await response.json();
+        if (data.rates && data.rates.NGN) {
+          setExchangeRate(data.rates.NGN);
+          console.log('Exchange rate updated:', data.rates.NGN);
+        }
+      } catch (error) {
+        console.error('Failed to fetch exchange rate, using default:', error);
+        // Fallback to approximate market rate if API fails
+        setExchangeRate(1550);
+      }
+    };
+    
+    fetchExchangeRate();
+    // Refresh rate every hour
+    const interval = setInterval(fetchExchangeRate, 3600000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Load currency preference from localStorage
+  useEffect(() => {
+    const savedCurrency = localStorage.getItem('app_currency');
+    if (savedCurrency === 'USD' || savedCurrency === 'NGN') {
+      setCurrency(savedCurrency);
+    }
+  }, []);
+
+  // Save currency preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('app_currency', currency);
+  }, [currency]);
+
+  // Currency conversion function
+  const convertAmount = (amount: number, fromCurrency: 'NGN' | 'USD' = 'NGN'): number => {
+    if (fromCurrency === 'NGN' && currency === 'USD') {
+      return amount / exchangeRate;
+    } else if (fromCurrency === 'USD' && currency === 'NGN') {
+      return amount * exchangeRate;
+    }
+    return amount;
+  };
+
+  // Currency formatter function with conversion
+  const formatCurrency = (amount: number, fromCurrency: 'NGN' | 'USD' = 'NGN') => {
+    const convertedAmount = convertAmount(amount, fromCurrency);
+    if (currency === 'USD') {
+      return `$${convertedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    return `₦${convertedAmount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
+
+  // Currency symbol
+  const currencySymbol = currency === 'USD' ? '$' : '₦';
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const savedInvoices = localStorage.getItem('cfo_invoices');
+    const savedAccountsReceivable = localStorage.getItem('cfo_accounts_receivable');
+    const savedExpenses = localStorage.getItem('cfo_expenses');
+    const savedRevenues = localStorage.getItem('cfo_revenues');
+    
+    if (savedInvoices) {
+      try {
+        setInvoices(JSON.parse(savedInvoices));
+      } catch (e) {
+        console.error('Error loading invoices:', e);
+      }
+    }
+    
+    if (savedAccountsReceivable) {
+      try {
+        setAccountsReceivable(JSON.parse(savedAccountsReceivable));
+      } catch (e) {
+        console.error('Error loading accounts receivable:', e);
+      }
+    }
+    
+    if (savedExpenses) {
+      try {
+        setExpenses(JSON.parse(savedExpenses));
+      } catch (e) {
+        console.error('Error loading expenses:', e);
+      }
+    }
+    
+    if (savedRevenues) {
+      try {
+        setRevenues(JSON.parse(savedRevenues));
+      } catch (e) {
+        console.error('Error loading revenues:', e);
+      }
+    }
+  }, []);
+
+  // Save invoices to localStorage whenever they change
+  useEffect(() => {
+    if (invoices.length > 0) {
+      localStorage.setItem('cfo_invoices', JSON.stringify(invoices));
+    }
+  }, [invoices]);
+
+  // Save accounts receivable to localStorage whenever they change
+  useEffect(() => {
+    if (accountsReceivable.length > 0) {
+      localStorage.setItem('cfo_accounts_receivable', JSON.stringify(accountsReceivable));
+    }
+  }, [accountsReceivable]);
+
+  // Save expenses to localStorage whenever they change
+  useEffect(() => {
+    if (expenses.length > 0) {
+      localStorage.setItem('cfo_expenses', JSON.stringify(expenses));
+    }
+  }, [expenses]);
+
+  // Save revenues to localStorage whenever they change
+  useEffect(() => {
+    if (revenues.length > 0) {
+      localStorage.setItem('cfo_revenues', JSON.stringify(revenues));
+    }
+  }, [revenues]);
+
+  // Bank balance checking function
+  const checkBankBalance = async () => {
+    try {
+      // TODO: Replace with actual API credentials from environment variables
+      const bearerToken = process.env.NEXT_PUBLIC_BANK_API_TOKEN || 'demo_token';
+      const clientSecret = process.env.NEXT_PUBLIC_BANK_CLIENT_SECRET || 'demo_secret';
+      const consentToken = process.env.NEXT_PUBLIC_BANK_CONSENT_TOKEN || 'demo_consent';
+      const idempotencyKey = Date.now().toString();
+      
+      // Create signature (simplified - implement proper SHA-256 in production)
+      const signature = `SHA-256(${idempotencyKey};${bearerToken})`;
+      
+      const response = await fetch(`https://666ab640-8d6a-491b-be32-e06642d051cf.mock.pstmn.io/accounts/${bankAccount}/balances`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${bearerToken}`,
+          'idempotency_key': idempotencyKey,
+          'signature': signature,
+          'consent_token': consentToken,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const newBalance = result.data.available_balance;
+        
+        // Calculate inflow
+        const savedLastBalance = localStorage.getItem('last_bank_balance');
+        const previousBalance = savedLastBalance ? parseFloat(savedLastBalance) : newBalance;
+        const inflow = newBalance - previousBalance;
+        
+        console.log('Bank balance check:', {
+          previousBalance,
+          newBalance,
+          inflow,
+          timestamp: new Date().toISOString(),
+        });
+        
+        // If there's a positive inflow, match it to unpaid invoices
+        if (inflow > 0) {
+          matchInflowToInvoices(inflow);
+        }
+        
+        // Update balances
+        setLastBalance(previousBalance);
+        setCurrentBalance(newBalance);
+        localStorage.setItem('last_bank_balance', newBalance.toString());
+      }
+    } catch (error) {
+      console.error('Error checking bank balance:', error);
+    }
+  };
+
+  // Match bank inflows to unpaid invoices
+  const matchInflowToInvoices = (inflowAmount: number) => {
+    const unpaidReceivables = accountsReceivable.filter(ar => !ar.isPaid);
+    
+    // Try to match the inflow amount to invoice amounts (with 1% tolerance for fees)
+    for (const receivable of unpaidReceivables) {
+      const invoiceAmount = receivable.amountNumeric;
+      const tolerance = invoiceAmount * 0.01; // 1% tolerance
+      
+      if (Math.abs(inflowAmount - invoiceAmount) <= tolerance) {
+        const paidDate = new Date().toISOString().split('T')[0];
+        
+        // Mark invoice as paid in accounts receivable
+        const updatedReceivables = accountsReceivable.map(ar => 
+          ar.invoiceId === receivable.invoiceId 
+            ? { ...ar, isPaid: true, paidDate, status: 'paid' }
+            : ar
+        );
+        setAccountsReceivable(updatedReceivables);
+        
+        // Create revenue record from paid invoice
+        const newRevenue = {
+          id: Date.now().toString(),
+          invoiceId: receivable.invoiceId,
+          invoiceNumber: receivable.invoiceNumber,
+          client: receivable.client,
+          amount: invoiceAmount,
+          amountFormatted: `₦${invoiceAmount.toLocaleString()}`,
+          category: 'Invoice Payment',
+          date: paidDate,
+          description: `Payment received for Invoice ${receivable.invoiceNumber} from ${receivable.client}`,
+        };
+        setRevenues([newRevenue, ...revenues]);
+        
+        console.log(`Invoice ${receivable.invoiceNumber} marked as paid. Amount: ₦${invoiceAmount.toLocaleString()}`);
+        console.log('Revenue recorded:', newRevenue);
+        alert(`Payment received for Invoice ${receivable.invoiceNumber} - ₦${invoiceAmount.toLocaleString()}\nRevenue recorded successfully!`);
+        break;
+      }
+    }
+  };
+
+  // Payroll Calculation Functions
+  const calculatePayrollBreakdown = (employee: any) => {
+    // CONTRACT STAFF: Paid per ATM machine
+    if (employee.employeeType === 'contract') {
+      const atmCount = parseFloat(employee.atmCount) || 0;
+      const ratePerAtm = parseFloat(employee.ratePerAtm) || 0;
+      const monthlyGross = atmCount * ratePerAtm;
+      
+      // Contract staff - simplified calculation (no pension, no tax withholding)
+      // They are responsible for their own taxes as independent contractors
+      const hmo = parseFloat(employee.hmo) || 0;
+      const loan = parseFloat(employee.loan) || 0;
+      const penalty = parseFloat(employee.penalty) || 0;
+      
+      const totalDeductions = hmo + loan + penalty;
+      const netPay = monthlyGross - totalDeductions;
+      
+      return {
+        employeeType: 'contract',
+        atmCount,
+        ratePerAtm,
+        annualGross: monthlyGross * 12,
+        monthlyGross,
+        basic: 0,
+        transport: 0,
+        housing: 0,
+        others: 0,
+        craMonthly: 0,
+        pensionEmployee: 0,
+        pensionEmployer: 0,
+        totalReliefs: 0,
+        taxablePay: 0,
+        taxPayable: 0,
+        minimumTax: 0,
+        taxDue: 0,
+        hmo,
+        hmoCompany: 0,
+        loan,
+        wht: 0,
+        penalty,
+        netPay,
+        totalDeductions
+      };
+    }
+    
+    // PERMANENT STAFF: Regular salary with Nigerian tax structure
+    const annualGross = parseFloat(employee.annualGross) || 0;
+    const monthlyGross = annualGross / 12;
+    
+    // Salary breakdown (Nigerian standard split)
+    // Basic: 15% - Base salary component
+    // Transport: 15% - Transportation allowance (non-taxable up to certain limit)
+    // Housing: 15% - Accommodation allowance (non-taxable up to certain limit)
+    // Others: 55% - Other allowances (meal, entertainment, utility, medical, etc.)
+    //         This includes: meal allowance, entertainment allowance, utility allowance,
+    //         leave allowance, medical allowance, and any other benefits
+    const basic = (monthlyGross * employee.basicPercent) / 100;
+    const transport = (monthlyGross * employee.transportPercent) / 100;
+    const housing = (monthlyGross * employee.housingPercent) / 100;
+    const others = (monthlyGross * employee.othersPercent) / 100;
+    
+    // CRA (Consolidated Relief Allowance) - Higher of 1% of gross annual or ₦200,000 + 20% of gross
+    const craOption1 = annualGross * 0.01;
+    const craOption2 = 200000 + (annualGross * 0.20);
+    const craAnnual = Math.max(craOption1, craOption2);
+    const craMonthly = craAnnual / 12;
+    
+    // Pension contributions
+    const pensionEmployee = monthlyGross * 0.08; // 8% employee
+    const pensionEmployer = monthlyGross * 0.10; // 10% employer
+    
+    // Total reliefs
+    const totalReliefs = craMonthly + pensionEmployee;
+    
+    // Taxable pay
+    const taxablePay = monthlyGross - totalReliefs;
+    
+    // Nigerian PAYE Tax calculation (2024 rates)
+    let taxPayable = 0;
+    let remaining = taxablePay * 12; // Annual taxable
+    
+    if (remaining > 0) {
+      // First ₦300,000 at 7%
+      const bracket1 = Math.min(remaining, 300000);
+      taxPayable += bracket1 * 0.07;
+      remaining -= bracket1;
+    }
+    if (remaining > 0) {
+      // Next ₦300,000 at 11%
+      const bracket2 = Math.min(remaining, 300000);
+      taxPayable += bracket2 * 0.11;
+      remaining -= bracket2;
+    }
+    if (remaining > 0) {
+      // Next ₦500,000 at 15%
+      const bracket3 = Math.min(remaining, 500000);
+      taxPayable += bracket3 * 0.15;
+      remaining -= bracket3;
+    }
+    if (remaining > 0) {
+      // Next ₦500,000 at 19%
+      const bracket4 = Math.min(remaining, 500000);
+      taxPayable += bracket4 * 0.19;
+      remaining -= bracket4;
+    }
+    if (remaining > 0) {
+      // Next ₦1,600,000 at 21%
+      const bracket5 = Math.min(remaining, 1600000);
+      taxPayable += bracket5 * 0.21;
+      remaining -= bracket5;
+    }
+    if (remaining > 0) {
+      // Above ₦3,200,000 at 24%
+      taxPayable += remaining * 0.24;
+    }
+    
+    const monthlyTaxPayable = taxPayable / 12;
+    
+    // Minimum tax (0.5% of gross income)
+    const minimumTax = (monthlyGross * 0.005);
+    
+    // Tax due is higher of calculated tax or minimum tax
+    const taxDue = Math.max(monthlyTaxPayable, minimumTax);
+    
+    // Additional deductions
+    const hmo = parseFloat(employee.hmo) || 0;
+    const hmoCompany = parseFloat(employee.hmoCompany) || 0;
+    const loan = parseFloat(employee.loan) || 0;
+    const wht = monthlyGross * 0.05; // WHT 5%
+    const penalty = parseFloat(employee.penalty) || 0;
+    
+    // Net pay calculation
+    const totalDeductions = pensionEmployee + taxDue + hmo + loan + penalty;
+    const netPay = monthlyGross - totalDeductions;
+    
+    return {
+      employeeType: 'permanent',
+      atmCount: 0,
+      ratePerAtm: 0,
+      annualGross,
+      monthlyGross,
+      basic,
+      transport,
+      housing,
+      others,
+      craMonthly,
+      pensionEmployee,
+      pensionEmployer,
+      totalReliefs,
+      taxablePay,
+      taxPayable: monthlyTaxPayable,
+      minimumTax,
+      taxDue,
+      hmo,
+      hmoCompany,
+      loan,
+      wht,
+      penalty,
+      netPay,
+      totalDeductions
+    };
+  };
+
+  // Delete/Cancel Invoice function
+  const handleDeleteInvoice = (invoiceToDelete: any) => {
+    if (window.confirm(`Are you sure you want to cancel/delete Invoice ${invoiceToDelete.invoiceNumber}?\n\nThis will remove the invoice and its accounts receivable entry.`)) {
+      // Remove from invoices list
+      const updatedInvoices = invoices.filter(inv => inv.id !== invoiceToDelete.invoiceId);
+      setInvoices(updatedInvoices);
+      
+      // Remove from accounts receivable
+      const updatedReceivables = accountsReceivable.filter(ar => ar.invoiceId !== invoiceToDelete.invoiceId);
+      setAccountsReceivable(updatedReceivables);
+      
+      // Close modal
+      setShowInvoiceDetailsModal(false);
+      
+      console.log(`Invoice ${invoiceToDelete.invoiceNumber} cancelled/deleted`);
+      alert(`Invoice ${invoiceToDelete.invoiceNumber} has been cancelled and removed.`);
+    }
+  };
+
+  // Set up hourly bank balance checking
+  useEffect(() => {
+    // Check balance immediately on mount
+    checkBankBalance();
+    
+    // Set up interval to check every hour (3600000 ms)
+    const intervalId = setInterval(() => {
+      checkBankBalance();
+    }, 3600000); // 1 hour
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
+  }, [bankAccount, accountsReceivable]);
+
+  // Client email mapping
+  const clientEmails: { [key: string]: string } = {
+    'First Bank': 'accounts@firstbank.ng',
+    'Union Bank': 'finance@unionbank.ng',
+    'Polaris Bank': 'billing@polarisbank.ng',
+    'Sterling Bank': 'accounts@sterlingbank.ng',
+    'GTBank': 'finance@gtbank.com',
+    'Access Bank': 'accounts@accessbank.ng',
+    'Zenith Bank': 'billing@zenithbank.com',
+    'UBA': 'finance@ubagroup.com',
+    'Fidelity Bank': 'accounts@fidelitybank.ng',
+    'Stanbic IBTC': 'finance@stanbicibtc.com',
+  };
+
+  const handleSendInvoice = (invoice: any) => {
+    setSelectedInvoice(invoice);
+    setEmailData({
+      to: clientEmails[invoice.client] || '',
+      subject: `Invoice ${invoice.invoiceNumber} from ATM Solutions Ltd`,
+      message: `Dear ${invoice.client} Team,\n\nPlease find attached invoice ${invoice.invoiceNumber} for the amount of ${formatCurrency(invoice.amount)}.\n\nDue Date: ${invoice.dueDate}\n\nThank you for your business.\n\nBest regards,\nATM Solutions Ltd`,
+    });
+    setShowEmailModal(true);
+  };
+
+  const sendInvoiceEmail = async () => {
+    try {
+      setIsSendingEmail(true);
+      console.log('Starting to send email...');
+      
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        alert('Your session has expired. Please log in again.');
+        window.location.href = '/login';
+        return;
+      }
+
+      // Find the full invoice data
+      const fullInvoice = invoices.find(inv => inv.invoiceNumber === selectedInvoice?.invoiceNumber);
+      
+      if (!fullInvoice) {
+        alert('Invoice not found');
+        setIsSendingEmail(false);
+        return;
+      }
+
+      // Prepare invoice data for email (with items from invoiceData if it's the current invoice)
+      const invoicePayload = {
+        invoiceNumber: fullInvoice.invoiceNumber,
+        client: fullInvoice.client,
+        amount: fullInvoice.amount,
+        issueDate: fullInvoice.issueDate,
+        dueDate: fullInvoice.dueDate,
+        items: invoiceData.items.filter(item => item.description).length > 0 
+          ? invoiceData.items.filter(item => item.description)
+          : [{ description: 'ATM Maintenance Services', quantity: 1, rate: fullInvoice.amount, amount: fullInvoice.amount }],
+        vat: invoiceData.vat || 7.5,
+        notes: invoiceData.notes || '',
+      };
+
+      console.log('Sending to:', emailData.to);
+      console.log('Invoice payload:', invoicePayload);
+
+      const response = await fetch('http://localhost:5000/api/v1/email/send-invoice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          to: emailData.to,
+          subject: emailData.subject,
+          message: emailData.message,
+          invoice: invoicePayload,
+        }),
+      });
+
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (data.success) {
+        alert(`Invoice sent successfully to ${emailData.to}${data.previewUrl ? '\n\nPreview URL (for testing): ' + data.previewUrl : ''}`);
+        setShowEmailModal(false);
+        setSelectedInvoice(null);
+        setEmailData({ to: '', subject: '', message: '' });
+      } else {
+        alert(`Failed to send email: ${data.message || data.error}`);
+      }
+    } catch (error: any) {
+      console.error('Error sending invoice email:', error);
+      alert(`Error sending email: ${error.message}`);
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  // Client data from sales database
+  // Get clients who have legal documents (confirmed they have necessary docs)
+  const getClientsWithLegalDocs = (): string[] => {
+    try {
+      const legalDocs = localStorage.getItem('legal_documents');
+      if (legalDocs) {
+        const documents = JSON.parse(legalDocs);
+        // Get unique client names who have Award Letter or Purchase Order
+        const clientsWithDocs = documents
+          .filter((doc: any) => 
+            doc.clientName && 
+            (doc.type === 'Award Letter' || doc.type === 'Purchase Order' || doc.category === 'Award Letter')
+          )
+          .map((doc: any) => doc.clientName);
+        return Array.from(new Set<string>(clientsWithDocs)).sort();
+      }
+    } catch (error) {
+      console.error('Error loading clients from Legal:', error);
+    }
+    return [];
+  };
+
+  const clients = getClientsWithLegalDocs();
+
+  // Calculate financial metrics from actual data
+  const totalRevenue = revenues.reduce((sum, rev) => sum + rev.amount, 0);
+  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const netProfit = totalRevenue - totalExpenses;
+  const cashFlow = currentBalance - lastBalance;
+
+  const financialMetrics = [
+    { label: 'Total Revenue', value: formatCurrency(totalRevenue), change: '0%', trend: 'up' },
+    { label: 'Operating Costs', value: formatCurrency(totalExpenses), change: '0%', trend: 'up' },
+    { label: 'Net Profit', value: formatCurrency(netProfit), change: '0%', trend: netProfit >= 0 ? 'up' : 'down' },
+    { label: 'Cash Flow', value: formatCurrency(cashFlow), change: '0%', trend: cashFlow >= 0 ? 'up' : 'down' },
+  ];
+
+  const revenueStreams: any[] = [];
+
+  return (
+    <DashboardLayout>
+      <div className="py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Finance Dashboard</h1>
+              <p className="mt-1 text-sm text-gray-600">Financial overview and metrics</p>
+            </div>
+            <div className="flex gap-2 items-start">
+              {/* Currency Toggle */}
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-md p-1 h-[42px]">
+                  <button
+                    onClick={() => setCurrency('NGN')}
+                    className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                      currency === 'NGN' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    ₦ NGN
+                  </button>
+                  <button
+                    onClick={() => setCurrency('USD')}
+                    className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                      currency === 'USD' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    $ USD
+                  </button>
+                </div>
+                <span className="text-xs text-gray-500 whitespace-nowrap">
+                  Rate: $1 = ₦{exchangeRate.toFixed(2)}
+                </span>
+              </div>
+              
+              <button 
+                onClick={() => setShowInvoiceModal(true)}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+              >
+                + Create Invoice
+              </button>
+              <button 
+                onClick={() => setShowAddModal(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+              >
+                + Record Expense
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 mt-6">
+          {/* Financial Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            {financialMetrics.map((metric) => (
+              <div key={metric.label} className="bg-white rounded-lg shadow p-6">
+                <div className="text-sm font-medium text-gray-600">{metric.label}</div>
+                <div className="mt-2 flex items-baseline">
+                  <div className="text-3xl font-bold text-gray-900">{metric.value}</div>
+                  <div className={`ml-2 text-sm font-semibold ${metric.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                    {metric.change}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Invoices Section - Removed, now accessible via Accounts Receivable */}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Revenue Streams */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Streams</h3>
+              <div className="space-y-4">
+                {revenueStreams.map((stream) => (
+                  <div key={stream.name}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium text-gray-700">{stream.name}</span>
+                      <span className="text-gray-900 font-semibold">{stream.amount}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className={`h-2 rounded-full ${stream.color}`} style={{ width: `${stream.percentage}%` }}></div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">{stream.percentage}% of total</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Accounts Receivable */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Accounts Receivable (Unpaid)</h3>
+              {accountsReceivable.filter(ar => !ar.isPaid).length === 0 ? (
+                <p className="text-gray-500 text-sm">No outstanding invoices</p>
+              ) : (
+                <div className="space-y-4">
+                  {accountsReceivable.filter(ar => !ar.isPaid).map((account) => (
+                    <div 
+                      key={account.invoiceId} 
+                      className="flex justify-between items-center border-b pb-3 last:border-b-0 cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors"
+                      onClick={() => {
+                        setSelectedInvoice(account);
+                        setShowInvoiceDetailsModal(true);
+                      }}
+                    >
+                      <div>
+                        <div className="font-medium text-gray-900">{account.client}</div>
+                        <div className="text-sm text-gray-500">Due: {account.dueDate}</div>
+                        <div className="text-xs text-gray-400">Invoice: {account.invoiceNumber}</div>
+                        {account.isPartialPayment && (
+                          <div className="text-xs text-blue-600 font-medium mt-1">
+                            Initial Payment: {formatCurrency(account.initialPayment || 0)} received
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-gray-900">{formatCurrency(account.amountNumeric || 0)}</div>
+                        {account.isPartialPayment && (
+                          <div className="text-xs text-gray-500">
+                            (Total: {formatCurrency(account.totalAmount || 0)})
+                          </div>
+                        )}
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          account.status === 'overdue' ? 'bg-red-100 text-red-800' : 
+                          account.status === 'due-today' ? 'bg-orange-100 text-orange-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {account.status === 'overdue' ? 'OVERDUE' :
+                           account.status === 'due-today' ? 'DUE TODAY' :
+                           'UPCOMING'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {['P&L Report', 'Cash Flow'].map((action) => (
+              <button key={action} className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg text-sm font-medium">
+                {action}
+              </button>
+            ))}
+            <button 
+              onClick={() => setShowBudgetModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg text-sm font-medium"
+            >
+              Budget Review
+            </button>
+            <button 
+              onClick={() => setShowPayrollModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg text-sm font-medium"
+            >
+              Payroll
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Transaction Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
+          <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative z-[10000]" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Record Expense</h2>
+            <p className="text-sm text-gray-600 mb-4">Revenue is automatically tracked through invoices. Use this form to record business expenses only.</p>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              // TODO: Submit to backend API
+              const newExpense = {
+                id: Date.now(),
+                ...formData,
+                amount: parseFloat(formData.amount.replace(/,/g, '')),
+                date: formData.date || new Date().toISOString().split('T')[0],
+              };
+              setExpenses([newExpense, ...expenses]);
+              console.log('New expense:', newExpense);
+              setShowAddModal(false);
+              setFormData({
+                type: 'expense',
+                category: '',
+                amount: '',
+                description: '',
+                date: '',
+              });
+            }}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Expense Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    required
+                  >
+                    <option value="">Select expense category</option>
+                    <option value="Spare Parts">Spare Parts</option>
+                    <option value="Salaries">Salaries & Wages</option>
+                    <option value="Transport">Transport & Logistics</option>
+                    <option value="Office">Office Supplies</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Equipment">Equipment & Tools</option>
+                    <option value="Marketing">Marketing & Advertising</option>
+                    <option value="Professional">Professional Services</option>
+                    <option value="Other">Other Expenses</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount ({currencySymbol})</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.amount}
+                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    placeholder="e.g., 1,500,000"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={(e) => setFormData({...formData, date: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    placeholder="Transaction details..."
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
+                >
+                  Record Expense
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Invoice Modal */}
+      {showInvoiceModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowInvoiceModal(false)}>
+          <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto relative z-[10000]" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Create Invoice</h2>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const total = invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) * (1 + invoiceData.vat / 100);
+              const initialPaymentAmount = parseFloat(invoiceData.initialPayment) || 0;
+              const balanceAmount = total - initialPaymentAmount;
+              
+              const newInvoice = {
+                id: Date.now().toString(),
+                invoiceNumber: invoiceData.invoiceNumber,
+                client: invoiceData.client,
+                amount: total,
+                initialPayment: initialPaymentAmount,
+                initialPaymentDate: invoiceData.initialPaymentDate || null,
+                balanceAmount: balanceAmount,
+                balancePaymentDate: invoiceData.balancePaymentDate || invoiceData.dueDate,
+                issueDate: invoiceData.issueDate,
+                dueDate: invoiceData.dueDate,
+                status: initialPaymentAmount >= total ? 'paid' : 'pending' as 'pending' | 'paid' | 'overdue',
+                paymentType: initialPaymentAmount > 0 && initialPaymentAmount < total ? 'partial' : initialPaymentAmount >= total ? 'full' : 'none',
+              };
+              setInvoices([newInvoice, ...invoices]);
+              
+              // Add to accounts receivable if unpaid (includes future and past-due)
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const dueDate = new Date(invoiceData.balancePaymentDate || invoiceData.dueDate);
+              dueDate.setHours(0, 0, 0, 0);
+              
+              // Determine status based on due date
+              let invoiceStatus = 'upcoming';
+              if (dueDate < today) {
+                invoiceStatus = 'overdue';
+              } else if (dueDate.getTime() === today.getTime()) {
+                invoiceStatus = 'due-today';
+              }
+              
+              // Only add to accounts receivable if there's a balance due
+              if (balanceAmount > 0) {
+                const newReceivable = {
+                  client: invoiceData.client,
+                  amount: formatCurrency(balanceAmount),
+                  amountNumeric: balanceAmount,
+                  totalAmount: total,
+                  initialPayment: initialPaymentAmount,
+                  dueDate: invoiceData.balancePaymentDate || invoiceData.dueDate,
+                  status: invoiceStatus,
+                  invoiceNumber: invoiceData.invoiceNumber,
+                  invoiceId: newInvoice.id,
+                  isPaid: false,
+                  isPartialPayment: initialPaymentAmount > 0,
+                };
+                setAccountsReceivable([newReceivable, ...accountsReceivable]);
+              }
+              
+              console.log('New invoice:', invoiceData);
+              setShowInvoiceModal(false);
+              setInvoiceData({
+                client: '',
+                invoiceNumber: '',
+                category: '',
+                issueDate: '',
+                dueDate: '',
+                items: [{ description: '', quantity: 1, rate: '', amount: '' }],
+                vat: 7.5,
+                notes: '',
+                initialPayment: '',
+                initialPaymentDate: '',
+                balancePaymentDate: '',
+              });
+            }}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                    <select
+                      value={invoiceData.client}
+                      onChange={(e) => setInvoiceData({...invoiceData, client: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      required
+                    >
+                      <option value="">Select client with legal documents</option>
+                      {clients.length > 0 ? (
+                        clients.map((client) => (
+                          <option key={client} value={client}>{client}</option>
+                        ))
+                      ) : (
+                        <option disabled>No clients with legal documents available</option>
+                      )}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Only clients with Award Letter/Purchase Order in Legal module
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
+                    <input
+                      type="text"
+                      required
+                      value={invoiceData.invoiceNumber}
+                      onChange={(e) => setInvoiceData({...invoiceData, invoiceNumber: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      placeholder="e.g., INV-2024-001"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Business Category</label>
+                  <select
+                    value={invoiceData.category}
+                    onChange={(e) => setInvoiceData({...invoiceData, category: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    required
+                  >
+                    <option value="">Select business category</option>
+                    <option value="Software">Software</option>
+                    <option value="ATM Maintenance">ATM Maintenance</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={invoiceData.issueDate}
+                      onChange={(e) => setInvoiceData({...invoiceData, issueDate: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={invoiceData.dueDate}
+                      onChange={(e) => setInvoiceData({...invoiceData, dueDate: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Line Items</label>
+                  {invoiceData.items.map((item, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-2 mb-2">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Description"
+                        value={item.description}
+                        onChange={(e) => {
+                          const newItems = [...invoiceData.items];
+                          newItems[index].description = e.target.value;
+                          setInvoiceData({...invoiceData, items: newItems});
+                        }}
+                        className="col-span-5 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      />
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        placeholder="Qty"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const newItems = [...invoiceData.items];
+                          newItems[index].quantity = parseInt(e.target.value);
+                          const rate = parseFloat(newItems[index].rate) || 0;
+                          newItems[index].amount = (newItems[index].quantity * rate).toFixed(2);
+                          setInvoiceData({...invoiceData, items: newItems});
+                        }}
+                        className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      />
+                      <input
+                        type="text"
+                        required
+                        placeholder={`Rate (${currencySymbol})`}
+                        value={item.rate}
+                        onChange={(e) => {
+                          const newItems = [...invoiceData.items];
+                          newItems[index].rate = e.target.value;
+                          const rate = parseFloat(e.target.value) || 0;
+                          newItems[index].amount = (newItems[index].quantity * rate).toFixed(2);
+                          setInvoiceData({...invoiceData, items: newItems});
+                        }}
+                        className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      />
+                      <input
+                        type="text"
+                        readOnly
+                        placeholder="Amount"
+                        value={item.amount}
+                        className="col-span-2 px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newItems = invoiceData.items.filter((_, i) => i !== index);
+                          setInvoiceData({...invoiceData, items: newItems.length ? newItems : [{ description: '', quantity: 1, rate: '', amount: '' }]});
+                        }}
+                        className="col-span-1 text-red-600 hover:text-red-800"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInvoiceData({...invoiceData, items: [...invoiceData.items, { description: '', quantity: 1, rate: '', amount: '' }]});
+                    }}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    + Add Line Item
+                  </button>
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Subtotal:</span>
+                      <span className="font-semibold text-gray-900">
+                        {formatCurrency(invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0))}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <label className="text-sm text-gray-600">VAT (%):</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="100"
+                        value={invoiceData.vat}
+                        onChange={(e) => setInvoiceData({...invoiceData, vat: parseFloat(e.target.value) || 0})}
+                        className="w-24 px-3 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-right bg-white text-gray-900"
+                      />
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">VAT Amount:</span>
+                      <span className="font-semibold text-gray-900">
+                        {formatCurrency(
+                          invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) * 
+                          (invoiceData.vat / 100)
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-lg font-bold border-t pt-2">
+                      <span className="text-gray-900">Total Amount:</span>
+                      <span className="text-gray-900">
+                        {formatCurrency(
+                          invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) * 
+                          (1 + invoiceData.vat / 100)
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    rows={3}
+                    value={invoiceData.notes}
+                    onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    placeholder="Additional notes or payment terms..."
+                  />
+                </div>
+
+                {/* Partial Payment Section */}
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Payment Schedule (Optional)</h3>
+                  <p className="text-xs text-gray-500 mb-3">If client pays an initial deposit, enter the amount and dates below</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Initial Payment Amount ({currencySymbol})</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={invoiceData.initialPayment}
+                        onChange={(e) => setInvoiceData({...invoiceData, initialPayment: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        placeholder="Enter deposit amount"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Initial Payment Date</label>
+                      <input
+                        type="date"
+                        value={invoiceData.initialPaymentDate}
+                        onChange={(e) => setInvoiceData({...invoiceData, initialPaymentDate: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Balance Payment Due Date</label>
+                      <input
+                        type="date"
+                        value={invoiceData.balancePaymentDate}
+                        onChange={(e) => setInvoiceData({...invoiceData, balancePaymentDate: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">Leave empty to use due date</p>
+                    </div>
+
+                    {invoiceData.initialPayment && parseFloat(invoiceData.initialPayment) > 0 && (
+                      <div className="bg-blue-50 p-3 rounded-md">
+                        <p className="text-xs font-medium text-blue-900 mb-1">Payment Summary:</p>
+                        <p className="text-xs text-blue-800">
+                          Initial: {formatCurrency(parseFloat(invoiceData.initialPayment))}
+                        </p>
+                        <p className="text-xs text-blue-800">
+                          Balance: {formatCurrency(
+                            (invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) * (1 + invoiceData.vat / 100)) - 
+                            parseFloat(invoiceData.initialPayment)
+                          )}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowInvoiceModal(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium"
+                >
+                  Create Invoice
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Send Invoice Email Modal */}
+      {showEmailModal && selectedInvoice && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowEmailModal(false)}>
+          <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative z-[10000]" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Send Invoice via Email</h2>
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="text-sm text-blue-800">
+                <strong>Invoice:</strong> {selectedInvoice.invoiceNumber} | <strong>Client:</strong> {selectedInvoice.client} | <strong>Amount:</strong> {formatCurrency(selectedInvoice.amount)}
+              </div>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              sendInvoiceEmail();
+            }}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={emailData.to}
+                    onChange={(e) => setEmailData({...emailData, to: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    placeholder="recipient@company.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                  <input
+                    type="text"
+                    required
+                    value={emailData.subject}
+                    onChange={(e) => setEmailData({...emailData, subject: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                  <textarea
+                    required
+                    rows={8}
+                    value={emailData.message}
+                    onChange={(e) => setEmailData({...emailData, message: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  />
+                </div>
+
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                  <div className="flex items-center text-sm text-gray-600">
+                    <svg className="h-5 w-5 text-gray-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                    <span>Invoice PDF will be automatically attached</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEmailModal(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSendingEmail}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md font-medium flex items-center justify-center"
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      Send Email
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Details Modal */}
+      {showInvoiceDetailsModal && selectedInvoice && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowInvoiceDetailsModal(false)}>
+          <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative z-[10000]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Invoice Details</h2>
+              <button 
+                onClick={() => setShowInvoiceDetailsModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Client</label>
+                  <div className="text-lg font-semibold text-gray-900">{selectedInvoice.client}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Amount</label>
+                  <div className="text-lg font-semibold text-gray-900">{selectedInvoice.amount}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Due Date</label>
+                  <div className="text-base text-gray-900">{selectedInvoice.dueDate}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Status</label>
+                  <div>
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                      selectedInvoice.status === 'overdue' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {selectedInvoice.status.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {selectedInvoice.invoiceNumber && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Invoice Number</label>
+                  <div className="text-base text-gray-900">{selectedInvoice.invoiceNumber}</div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowInvoiceDetailsModal(false);
+                  handleSendInvoice(selectedInvoice);
+                }}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md font-medium"
+              >
+                Send Invoice
+              </button>
+              <button
+                onClick={() => handleDeleteInvoice(selectedInvoice)}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-medium"
+              >
+                Cancel Invoice
+              </button>
+              <button
+                onClick={() => setShowInvoiceDetailsModal(false)}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payroll Modal - Batch Processing */}
+      {showPayrollModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowPayrollModal(false)}>
+          <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+          <div className="bg-white rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto relative z-[10000]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Process Payroll - Batch Payment</h2>
+              <button
+                onClick={() => setShowPayrollModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              
+              // Validate all employees have required data
+              const validEmployees = payrollEmployees.filter(emp => {
+                if (!emp.employeeName || !emp.employeeId || !emp.jobTitle) return false;
+                
+                if (emp.employeeType === 'contract') {
+                  // Contract staff need ATM count and rate
+                  return emp.atmCount && emp.ratePerAtm;
+                } else {
+                  // Permanent staff need annual gross
+                  return emp.annualGross;
+                }
+              });
+              
+              if (validEmployees.length === 0) {
+                alert('Please add at least one employee with complete information');
+                return;
+              }
+
+              // Calculate totals
+              const totalPayroll = validEmployees.reduce((sum, emp) => {
+                const breakdown = calculatePayrollBreakdown(emp);
+                return sum + breakdown.netPay;
+              }, 0);
+
+              // Get payment details from form
+              const formData = new FormData(e.currentTarget);
+              const paymentDate = formData.get('paymentDate');
+              const paymentMonth = formData.get('paymentMonth');
+              const paymentMethod = formData.get('paymentMethod');
+
+              const payrollDetails = validEmployees.map((emp, idx) => {
+                const breakdown = calculatePayrollBreakdown(emp);
+                return {
+                  sn: idx + 1,
+                  ...emp,
+                  ...breakdown
+                };
+              });
+
+              console.log('Batch Payroll processed:', {
+                employees: payrollDetails,
+                totalAmount: totalPayroll,
+                paymentDate,
+                paymentMonth,
+                paymentMethod,
+                count: validEmployees.length
+              });
+
+              alert(`Batch Payroll Processed Successfully!\n\nEmployees: ${validEmployees.length}\nTotal Net Pay: ${formatCurrency(totalPayroll)}\n\nPayroll expense has been recorded.`);
+              
+              // Reset employees list
+              setPayrollEmployees([{
+                id: Date.now(),
+                employeeType: 'permanent',
+                employeeName: '',
+                employeeId: '',
+                jobTitle: '',
+                annualGross: '',
+                basicPercent: 15,
+                transportPercent: 15,
+                housingPercent: 15,
+                othersPercent: 55,
+                atmCount: '0',
+                ratePerAtm: '0',
+                hmo: '0',
+                hmoCompany: '0',
+                loan: '0',
+                penalty: '0',
+              }]);
+              
+              setShowPayrollModal(false);
+            }}>
+              <div className="space-y-4">
+                {/* Employee List */}
+                <div className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Employees ({payrollEmployees.length})</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayrollEmployees([...payrollEmployees, {
+                          id: Date.now(),
+                          employeeType: 'permanent',
+                          employeeName: '',
+                          employeeId: '',
+                          jobTitle: '',
+                          annualGross: '',
+                          basicPercent: 15,
+                          transportPercent: 15,
+                          housingPercent: 15,
+                          othersPercent: 55,
+                          atmCount: '0',
+                          ratePerAtm: '0',
+                          hmo: '0',
+                          hmoCompany: '0',
+                          loan: '0',
+                          penalty: '0',
+                        }]);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium"
+                    >
+                      + Add Employee
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                    {payrollEmployees.map((employee, index) => (
+                      <div key={employee.id} className="bg-white border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-sm font-medium text-gray-700">Employee #{index + 1}</span>
+                          {payrollEmployees.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPayrollEmployees(payrollEmployees.filter((_, i) => i !== index));
+                              }}
+                              className="text-red-600 hover:text-red-800 text-sm"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-5 gap-3 mb-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Employee Type *</label>
+                            <select
+                              value={employee.employeeType}
+                              disabled={employee.employeeName !== ''}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                updated[index].employeeType = e.target.value;
+                                setPayrollEmployees(updated);
+                              }}
+                              className={`w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 ${employee.employeeName ? 'bg-gray-100 text-gray-700' : 'bg-white text-gray-900'}`}
+                            >
+                              <option value="permanent">Permanent Staff</option>
+                              <option value="contract">Contract Staff (Field Engineer)</option>
+                            </select>
+                            {employee.employeeName && (
+                              <p className="text-[9px] text-gray-500 mt-0.5">Auto-filled from HR</p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Employee Name *</label>
+                            <select
+                              value={employee.employeeName}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                const selectedName = e.target.value;
+                                updated[index].employeeName = selectedName;
+                                
+                                // Auto-fill employee details from HR data
+                                if (selectedName) {
+                                  const hrEmployee = hrEmployees.find(emp => emp.name === selectedName);
+                                  if (hrEmployee) {
+                                    updated[index].employeeId = hrEmployee.employeeId;
+                                    updated[index].jobTitle = hrEmployee.role;
+                                    updated[index].employeeType = hrEmployee.type;
+                                  }
+                                }
+                                
+                                setPayrollEmployees(updated);
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                            >
+                              <option value="">-- Select Employee --</option>
+                              {hrEmployees
+                                .filter(emp => emp.status === 'active')
+                                .map(emp => (
+                                  <option key={emp.id} value={emp.name}>
+                                    {emp.name} ({emp.role})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Employee ID *</label>
+                            <input
+                              type="text"
+                              value={employee.employeeId}
+                              readOnly
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-gray-100 text-gray-700"
+                              placeholder="Auto-filled"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Job Title *</label>
+                            <input
+                              type="text"
+                              value={employee.jobTitle}
+                              readOnly
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-gray-100 text-gray-700"
+                              placeholder="Auto-filled"
+                            />
+                          </div>
+
+                          {employee.employeeType === 'permanent' ? (
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Annual Gross ({currencySymbol}) *</label>
+                              <input
+                                type="number"
+                                value={employee.annualGross}
+                                onChange={(e) => {
+                                  const updated = [...payrollEmployees];
+                                  updated[index].annualGross = e.target.value;
+                                  setPayrollEmployees(updated);
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                                placeholder="1800000"
+                              />
+                            </div>
+                          ) : (
+                            <div className="col-span-1"></div>
+                          )}
+                        </div>
+
+                        {/* Contract Staff: ATM-based Payment */}
+                        {employee.employeeType === 'contract' && (
+                          <div className="grid grid-cols-3 gap-3 mb-3 bg-blue-50 p-3 rounded">
+                            <div>
+                              <label className="block text-xs font-medium text-blue-900 mb-1">Number of ATMs *</label>
+                              <input
+                                type="number"
+                                value={employee.atmCount}
+                                onChange={(e) => {
+                                  const updated = [...payrollEmployees];
+                                  updated[index].atmCount = e.target.value;
+                                  setPayrollEmployees(updated);
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                                placeholder="10"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-blue-900 mb-1">Rate per ATM ({currencySymbol}) *</label>
+                              <input
+                                type="number"
+                                value={employee.ratePerAtm}
+                                onChange={(e) => {
+                                  const updated = [...payrollEmployees];
+                                  updated[index].ratePerAtm = e.target.value;
+                                  setPayrollEmployees(updated);
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                                placeholder="15000"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-blue-900 mb-1">Monthly Total</label>
+                              <div className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded bg-blue-100 text-blue-900 font-semibold">
+                                {formatCurrency((parseFloat(employee.atmCount) || 0) * (parseFloat(employee.ratePerAtm) || 0))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Additional Deductions Row */}
+                        <div className="grid grid-cols-4 gap-3 mb-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">HMO ({currencySymbol})</label>
+                            <input
+                              type="number"
+                              value={employee.hmo}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                updated[index].hmo = e.target.value;
+                                setPayrollEmployees(updated);
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">HMO Company ({currencySymbol})</label>
+                            <input
+                              type="number"
+                              value={employee.hmoCompany}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                updated[index].hmoCompany = e.target.value;
+                                setPayrollEmployees(updated);
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Loan ({currencySymbol})</label>
+                            <input
+                              type="number"
+                              value={employee.loan}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                updated[index].loan = e.target.value;
+                                setPayrollEmployees(updated);
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Penalty ({currencySymbol})</label>
+                            <input
+                              type="number"
+                              value={employee.penalty}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                updated[index].penalty = e.target.value;
+                                setPayrollEmployees(updated);
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Payroll Breakdown Display */}
+                        {((employee.employeeType === 'permanent' && employee.annualGross && parseFloat(employee.annualGross) > 0) ||
+                          (employee.employeeType === 'contract' && employee.atmCount && employee.ratePerAtm)) && (() => {
+                          const breakdown = calculatePayrollBreakdown(employee);
+                          
+                          if (employee.employeeType === 'contract') {
+                            // CONTRACT STAFF BREAKDOWN
+                            return (
+                              <div className="mt-3 pt-3 border-t bg-blue-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
+                                <p className="text-xs font-semibold text-blue-900 mb-2">Contract Staff Payment (Per ATM)</p>
+                                <div className="grid grid-cols-4 gap-3 text-xs">
+                                  <div>
+                                    <span className="text-blue-700 block">ATM Machines:</span>
+                                    <p className="font-semibold text-blue-900">{breakdown.atmCount} units</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-blue-700 block">Rate per ATM:</span>
+                                    <p className="font-semibold text-blue-900">{formatCurrency(breakdown.ratePerAtm)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-blue-700 block">Monthly Gross:</span>
+                                    <p className="font-semibold text-blue-900">{formatCurrency(breakdown.monthlyGross)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-blue-700 block">Deductions:</span>
+                                    <p className="font-semibold text-red-600">{formatCurrency(breakdown.totalDeductions)}</p>
+                                  </div>
+                                </div>
+                                <div className="mt-2 pt-2 border-t border-blue-200">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm font-semibold text-blue-900">Net Pay:</span>
+                                    <span className="text-lg font-bold text-green-600">{formatCurrency(breakdown.netPay)}</span>
+                                  </div>
+                                  <p className="text-[9px] text-blue-700 mt-1">*Contract staff handle their own tax obligations</p>
+                                </div>
+                              </div>
+                            );
+                          } else {
+                            // PERMANENT STAFF BREAKDOWN
+                            return (
+                              <div className="mt-3 pt-3 border-t bg-gray-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
+                                <p className="text-xs font-semibold text-gray-900 mb-2">Permanent Staff Breakdown (Nigerian Tax Structure)</p>
+                                <div className="grid grid-cols-6 gap-2 text-xs">
+                                  <div>
+                                    <span className="text-gray-600 block">Monthly Gross:</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.monthlyGross)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Basic (15%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.basic)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Transport (15%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.transport)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Housing (15%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.housing)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Others (55%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.others)}</p>
+                                    <p className="text-[9px] text-gray-500 mt-0.5">Meal, entertainment, utility, medical & other allowances</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">CRA:</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.craMonthly)}</p>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-6 gap-2 text-xs mt-2">
+                                  <div>
+                                    <span className="text-gray-600 block">Pension (8%):</span>
+                                    <p className="font-semibold text-red-600">{formatCurrency(breakdown.pensionEmployee)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Employer (10%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.pensionEmployer)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Taxable Pay:</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.taxablePay)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Tax Due (PAYE):</span>
+                                    <p className="font-semibold text-red-600">{formatCurrency(breakdown.taxDue)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">WHT (5%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.wht)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Net Pay:</span>
+                                    <p className="font-bold text-green-600 text-sm">{formatCurrency(breakdown.netPay)}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Payment Details */}
+                <div className="grid grid-cols-3 gap-4 border-t pt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Month</label>
+                    <input
+                      type="month"
+                      name="paymentMonth"
+                      required
+                      defaultValue={new Date().toISOString().slice(0, 7)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+                    <input
+                      type="date"
+                      name="paymentDate"
+                      required
+                      defaultValue={new Date().toISOString().split('T')[0]}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                    <select
+                      name="paymentMethod"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    >
+                      <option value="Bank Transfer">Bank Transfer</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Cheque">Cheque</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Total Summary */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-xs text-blue-700">Employees</p>
+                      <p className="text-lg font-bold text-blue-900">
+                        {payrollEmployees.filter(e => {
+                          if (!e.employeeName) return false;
+                          if (e.employeeType === 'contract') {
+                            return e.atmCount && e.ratePerAtm;
+                          }
+                          return e.annualGross;
+                        }).length}
+                      </p>
+                      <p className="text-[9px] text-blue-600">
+                        {payrollEmployees.filter(e => e.employeeType === 'permanent' && e.annualGross).length} permanent, {' '}
+                        {payrollEmployees.filter(e => e.employeeType === 'contract' && e.atmCount && e.ratePerAtm).length} contract
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-700">Total Gross Pay</p>
+                      <p className="text-lg font-bold text-blue-900">
+                        {formatCurrency(
+                          payrollEmployees.reduce((sum, emp) => {
+                            if (!emp.employeeName) return sum;
+                            if (emp.employeeType === 'contract' && (!emp.atmCount || !emp.ratePerAtm)) return sum;
+                            if (emp.employeeType === 'permanent' && (!emp.annualGross || parseFloat(emp.annualGross) === 0)) return sum;
+                            const breakdown = calculatePayrollBreakdown(emp);
+                            return sum + breakdown.monthlyGross;
+                          }, 0)
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-700">Total Deductions</p>
+                      <p className="text-lg font-bold text-red-600">
+                        {formatCurrency(
+                          payrollEmployees.reduce((sum, emp) => {
+                            if (!emp.employeeName) return sum;
+                            if (emp.employeeType === 'contract' && (!emp.atmCount || !emp.ratePerAtm)) return sum;
+                            if (emp.employeeType === 'permanent' && (!emp.annualGross || parseFloat(emp.annualGross) === 0)) return sum;
+                            const breakdown = calculatePayrollBreakdown(emp);
+                            return sum + breakdown.totalDeductions;
+                          }, 0)
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-700">Total Net Pay</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {formatCurrency(
+                          payrollEmployees.reduce((sum, emp) => {
+                            if (!emp.employeeName) return sum;
+                            if (emp.employeeType === 'contract' && (!emp.atmCount || !emp.ratePerAtm)) return sum;
+                            if (emp.employeeType === 'permanent' && (!emp.annualGross || parseFloat(emp.annualGross) === 0)) return sum;
+                            const breakdown = calculatePayrollBreakdown(emp);
+                            return sum + breakdown.netPay;
+                          }, 0)
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPayrollModal(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
+                >
+                  Process Batch Payroll
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Budget Review Modal */}
+      {showBudgetModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowBudgetModal(false)}>
+          <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto relative z-[10000]" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Budget Review & Planning</h2>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const budgetData = {
+                period: formData.get('period'),
+                category: formData.get('category'),
+                budgetedAmount: formData.get('budgetedAmount'),
+                actualAmount: formData.get('actualAmount'),
+                notes: formData.get('notes'),
+              };
+              console.log('Budget data:', budgetData);
+              // TODO: Submit to backend API
+              alert('Budget updated successfully!');
+              setShowBudgetModal(false);
+            }}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Budget Period</label>
+                    <select
+                      name="period"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    >
+                      <option value="">Select period</option>
+                      <option value="January 2025">January 2025</option>
+                      <option value="February 2025">February 2025</option>
+                      <option value="March 2025">March 2025</option>
+                      <option value="Q1 2025">Q1 2025</option>
+                      <option value="Q2 2025">Q2 2025</option>
+                      <option value="Q3 2025">Q3 2025</option>
+                      <option value="Q4 2025">Q4 2025</option>
+                      <option value="2025">Full Year 2025</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select
+                      name="category"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    >
+                      <option value="">Select category</option>
+                      <option value="Revenue">Revenue</option>
+                      <option value="Operating Expenses">Operating Expenses</option>
+                      <option value="Salaries & Wages">Salaries & Wages</option>
+                      <option value="Marketing">Marketing</option>
+                      <option value="Equipment">Equipment</option>
+                      <option value="Office Expenses">Office Expenses</option>
+                      <option value="Transport">Transport</option>
+                      <option value="Utilities">Utilities</option>
+                      <option value="Professional Services">Professional Services</option>
+                      <option value="Capital Expenditure">Capital Expenditure</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Budgeted Amount ({currencySymbol})</label>
+                    <input
+                      type="number"
+                      name="budgetedAmount"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      placeholder="5000000"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Actual Amount ({currencySymbol}) - Auto-calculated from Expenses</label>
+                    <input
+                      type="number"
+                      name="actualAmount"
+                      value={(() => {
+                        const category = (document.querySelector('select[name="category"]') as HTMLSelectElement)?.value;
+                        if (!category) return '';
+                        
+                        // Map budget categories to expense categories
+                        const categoryMap: { [key: string]: string[] } = {
+                          'Salaries & Wages': ['Salaries'],
+                          'Marketing': ['Marketing'],
+                          'Equipment': ['Equipment'],
+                          'Office Expenses': ['Office'],
+                          'Transport': ['Transport'],
+                          'Utilities': ['Utilities'],
+                          'Professional Services': ['Professional'],
+                          'Operating Expenses': ['Spare Parts', 'Other'],
+                        };
+                        
+                        const expenseCategories = categoryMap[category] || [];
+                        const total = expenses
+                          .filter(exp => expenseCategories.includes(exp.category))
+                          .reduce((sum, exp) => sum + exp.amount, 0);
+                        
+                        return total || '';
+                      })()}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-900 cursor-not-allowed"
+                      placeholder="Auto-calculated from expenses"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    name="notes"
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    placeholder="Budget notes, variance explanation, or action items..."
+                  />
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                  <h3 className="text-sm font-semibold text-blue-900 mb-2">Budget Summary</h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="text-blue-700">Variance:</div>
+                    <div className="text-blue-900 font-medium">Will be calculated</div>
+                    <div className="text-blue-700">Status:</div>
+                    <div className="text-blue-900 font-medium">Under/Over Budget</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowBudgetModal(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
+                >
+                  Save Budget
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </DashboardLayout>
+  );
+}
