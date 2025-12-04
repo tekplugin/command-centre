@@ -474,51 +474,31 @@ export default function HRPage() {
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Employee Name * {employeesWithDocs.length > 0 && <span className="text-blue-600 text-xs">(or select from Legal)</span>}
+                        Employee Name * {employeesWithDocs.length > 0 && <span className="text-green-600 text-xs">(from Legal)</span>}
                       </label>
-                      {employeesWithDocs.length > 0 ? (
-                        <div className="space-y-2">
-                          <select
-                            value={formData.name}
-                            onChange={(e) => {
-                              const selectedEmployee = employeesWithDocs.find(emp => emp.name === e.target.value);
-                              setFormData({
-                                ...formData, 
-                                name: e.target.value,
-                                employeeId: selectedEmployee?.id || ''
-                              });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                          >
-                            <option value="">Select from Legal or type below</option>
-                            {employeesWithDocs.map(emp => (
-                              <option key={emp.id} value={emp.name}>{emp.name} ({emp.id})</option>
-                            ))}
-                          </select>
-                          <input
-                            type="text"
-                            required
-                            value={formData.name}
-                            onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                            placeholder="Or type employee name manually"
-                          />
-                        </div>
-                      ) : (
-                        <input
-                          type="text"
-                          required
-                          value={formData.name}
-                          onChange={(e) => setFormData({...formData, name: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                          placeholder="Enter employee full name"
-                        />
-                      )}
-                      <p className="text-xs text-gray-500 mt-1">
-                        {employeesWithDocs.length > 0 
-                          ? 'Select from Legal dropdown or type manually below' 
-                          : 'Type name here, then upload documents in Legal'}
-                      </p>
+                      <select
+                        required
+                        value={formData.name}
+                        onChange={(e) => {
+                          const selectedEmployee = employeesWithDocs.find(emp => emp.name === e.target.value);
+                          setFormData({
+                            ...formData, 
+                            name: e.target.value,
+                            employeeId: selectedEmployee?.id || ''
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      >
+                        <option value="">Select employee from Legal</option>
+                        {employeesWithDocs.length > 0 ? (
+                          employeesWithDocs.map(emp => (
+                            <option key={emp.id} value={emp.name}>{emp.name} ({emp.id})</option>
+                          ))
+                        ) : (
+                          <option disabled>No employees with documents in Legal</option>
+                        )}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">Upload staff documents in Legal first</p>
                     </div>
 
                     <div>
@@ -530,12 +510,9 @@ export default function HRPage() {
                         onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
                         placeholder="EMP-001"
+                        readOnly={formData.name !== ''}
                       />
-                      <p className="text-xs text-gray-500 mt-1">
-                        {formData.name && employeesWithDocs.some(e => e.name === formData.name) 
-                          ? 'Auto-filled from Legal' 
-                          : 'Enter unique employee ID'}
-                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Auto-filled from Legal</p>
                     </div>
 
                     <div>

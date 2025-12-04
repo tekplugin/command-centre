@@ -43,6 +43,24 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(rateLimiter);
 
+// Root route - Welcome page with API info
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'Command Centre API',
+    version: '1.0.0',
+    status: 'running',
+    message: 'Welcome to Command Centre Backend API',
+    endpoints: {
+      health: '/health',
+      api: `/api/${process.env.API_VERSION || 'v1'}`,
+      auth: `/api/${process.env.API_VERSION || 'v1'}/auth`,
+      docs: '/api/v1/docs'
+    },
+    frontend: 'http://localhost:3000',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

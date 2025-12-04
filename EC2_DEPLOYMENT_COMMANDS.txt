@@ -1,0 +1,115 @@
+# Command Centre - EC2 Deployment Commands
+# EC2 IP: 13.219.183.238
+
+## STEP 1: Connect to EC2
+# Note: Replace PATH_TO_YOUR_PEM with the actual path to your downloaded .pem file
+
+# Example: If your .pem is in Downloads folder:
+# ssh -i "$env:USERPROFILE\Downloads\command-centre-key.pem" ubuntu@13.219.183.238
+
+## STEP 2: Update System
+sudo apt update && sudo apt upgrade -y
+
+## STEP 3: Install Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+## STEP 4: Install PM2
+sudo npm install -g pm2
+
+## STEP 5: Install Nginx
+sudo apt install -y nginx
+
+## STEP 6: Install Git
+sudo apt install -y git
+
+## STEP 7: Verify Installations
+node --version
+npm --version
+pm2 --version
+nginx -v
+
+## STEP 8: Clone Repository
+cd /home/ubuntu
+git clone https://github.com/tekplugin/command-centre.git
+cd command-centre/backend
+
+## STEP 9: Install Dependencies
+npm install
+
+## STEP 10: Create .env File
+nano .env
+
+# Paste this content:
+NODE_ENV=production
+PORT=5000
+MONGODB_URI=mongodb+srv://ofolufemi_db_user:rBqGV9U6EgIEUz1Q@cluster0.itaxd2n.mongodb.net/commandcentre?retryWrites=true&w=majority
+JWT_SECRET=en3970XQZJGg5Ohum1K8BMNSljWFCcozIfPasRUYVkb4qrxtpwDEH6dTL2ivAy
+JWT_EXPIRES_IN=7d
+RESEND_API_KEY=re_Deb38n68_HbuwY1KppJ4yJRtP6yw8aD8p
+FRONTEND_URL=http://13.219.183.238
+AWS_REGION=us-east-1
+
+# Save: Ctrl+X, then Y, then Enter
+
+## STEP 11: Build TypeScript
+npm run build
+
+## STEP 12: Start with PM2
+pm2 start dist/index.js --name command-centre-backend
+
+## STEP 13: Save PM2 Config
+pm2 save
+
+## STEP 14: Auto-start on Reboot
+pm2 startup
+# Run the command it outputs
+
+## STEP 15: Create Admin User
+node scripts/create-admin.js
+
+## STEP 16: Configure Nginx
+sudo nano /etc/nginx/sites-available/command-centre
+
+# Paste this content:
+server {
+    listen 80;
+    server_name 13.219.183.238;
+
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Save: Ctrl+X, then Y, then Enter
+
+## STEP 17: Enable Nginx Config
+sudo ln -s /etc/nginx/sites-available/command-centre /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+
+## STEP 18: Test Backend
+curl http://13.219.183.238/health
+
+# Should return: {"status":"ok","timestamp":"..."}
+
+## DEPLOYMENT COMPLETE!
+# Backend URL: http://13.219.183.238
+# Health Check: http://13.219.183.238/health
+# API Base: http://13.219.183.238/api/v1
+
+## Useful Commands:
+# Check PM2 status: pm2 status
+# View logs: pm2 logs command-centre-backend
+# Restart: pm2 restart command-centre-backend
+# Monitor: pm2 monit
