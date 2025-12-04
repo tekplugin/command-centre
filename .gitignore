@@ -7,6 +7,12 @@ node_modules/
 .env.local
 .env.*.local
 *.env
+.env.production
+.env.development
+backend/.env
+backend/.env.*
+web/.env
+web/.env.*
 
 # Build outputs
 dist/
