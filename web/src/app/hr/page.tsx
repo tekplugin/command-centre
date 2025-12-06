@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
+import PayrollManagement from '@/components/PayrollManagement';
+import { PayrollSubmission, PayrollEmployee, calculatePayrollBreakdown as calcPayroll } from '@/utils/nigerianPayroll';
 
 export default function HRPage() {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -10,19 +12,43 @@ export default function HRPage() {
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [showEmployeeListModal, setShowEmployeeListModal] = useState(false);
+  const [showEmployeeDetailModal, setShowEmployeeDetailModal] = useState(false);
+  const [showEditEmployeeModal, setShowEditEmployeeModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [employeeListFilter, setEmployeeListFilter] = useState<'all' | 'onLeave' | 'departments'>('all');
   const [selectedEmployeeForDocs, setSelectedEmployeeForDocs] = useState<any>(null);
-  const [legalDocuments, setLegalDocuments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [payrollSubmissions, setPayrollSubmissions] = useState<PayrollSubmission[]>([]);
+  const [staffDocuments, setStaffDocuments] = useState<any[]>([]);
   
-  // Load legal documents to check for staff documents
+  // Load payroll submissions
   useEffect(() => {
-    const savedDocuments = localStorage.getItem('legal_documents');
+    const savedPayrolls = localStorage.getItem('payroll_submissions');
+    if (savedPayrolls) {
+      try {
+        setPayrollSubmissions(JSON.parse(savedPayrolls));
+      } catch (e) {
+        console.error('Error loading payrolls:', e);
+      }
+    }
+  }, [showPayrollModal]);
+
+  // Handle payroll updates
+  const handlePayrollUpdate = (payrolls: PayrollSubmission[]) => {
+    setPayrollSubmissions(payrolls);
+    localStorage.setItem('payroll_submissions', JSON.stringify(payrolls));
+  };
+  
+  // Load HR staff documents
+  useEffect(() => {
+    const savedDocuments = localStorage.getItem('hr_staff_documents');
     if (savedDocuments) {
       try {
-        setLegalDocuments(JSON.parse(savedDocuments));
+        setStaffDocuments(JSON.parse(savedDocuments));
       } catch (e) {
-        console.error('Error loading legal documents:', e);
+        console.error('Error loading staff documents:', e);
       }
     }
 
@@ -46,46 +72,6 @@ export default function HRPage() {
       }
     }
   }, [showAddModal]); // Reload when modal opens
-  
-  // Get unique employees from legal documents
-  const getEmployeesFromLegal = () => {
-    const employeeMap = new Map();
-    
-    legalDocuments.forEach(doc => {
-      if (doc.employeeId && doc.employeeName) {
-        employeeMap.set(doc.employeeId, {
-          id: doc.employeeId,
-          name: doc.employeeName,
-        });
-      }
-    });
-    
-    return Array.from(employeeMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  };
-  
-  const employeesWithDocs = getEmployeesFromLegal();
-  
-  // Check if employee has required documents in Legal
-  const checkEmployeeDocuments = (employeeId: string, employeeName: string) => {
-    const requiredDocs = [
-      'Staff Document - NDA',
-      'Staff Document - Offer Letter',
-      'Staff Document - Employment Contract',
-    ];
-    
-    const employeeDocs = legalDocuments.filter(doc => 
-      doc.employeeId === employeeId || doc.employeeName === employeeName
-    );
-    
-    const uploadedCategories = employeeDocs.map(doc => doc.category);
-    const missingDocs = requiredDocs.filter(req => !uploadedCategories.includes(req));
-    
-    return {
-      hasAllRequired: missingDocs.length === 0,
-      missingDocs,
-      uploadedDocs: employeeDocs.length,
-    };
-  };
   
   const [formData, setFormData] = useState({
     // Basic Info
@@ -279,19 +265,40 @@ export default function HRPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 mt-6">
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white rounded-lg shadow p-6">
+            <div 
+              onClick={() => {
+                setEmployeeListFilter('all');
+                setShowEmployeeListModal(true);
+              }}
+              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+            >
               <div className="text-sm font-medium text-gray-600">Total Employees</div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
+            <div 
+              onClick={() => {
+                setEmployeeListFilter('onLeave');
+                setShowEmployeeListModal(true);
+              }}
+              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+            >
               <div className="text-sm font-medium text-gray-600">On Leave</div>
               <div className="text-3xl font-bold text-orange-600 mt-2">{stats.onLeave}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
+            <div 
+              onClick={() => setShowLeaveModal(true)}
+              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+            >
               <div className="text-sm font-medium text-gray-600">Pending Requests</div>
               <div className="text-3xl font-bold text-yellow-600 mt-2">{stats.pending}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
+            <div 
+              onClick={() => {
+                setEmployeeListFilter('departments');
+                setShowEmployeeListModal(true);
+              }}
+              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+            >
               <div className="text-sm font-medium text-gray-600">Departments</div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{stats.departments}</div>
             </div>
@@ -306,13 +313,19 @@ export default function HRPage() {
               <div className="p-6 space-y-4">
                 {employees.length > 0 ? (
                   employees.map((emp) => {
-                    const empDocs = legalDocuments.filter(doc => 
+                    const empDocs = staffDocuments.filter(doc => 
                       doc.employeeId === emp.employeeId || doc.employeeName === emp.name
                     );
                     return (
                       <div key={emp.id} className="border rounded-lg p-3 hover:bg-gray-50">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center flex-1">
+                          <div 
+                            onClick={() => {
+                              setSelectedEmployee(emp);
+                              setShowEmployeeDetailModal(true);
+                            }}
+                            className="flex items-center flex-1 cursor-pointer"
+                          >
                             <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
                               {emp.name.split(' ').map((n: string) => n[0]).join('')}
                             </div>
@@ -334,6 +347,20 @@ export default function HRPage() {
                               title="Upload Documents"
                             >
                               📎 Docs
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove employee: ${emp.name}?\n\nThis will permanently delete the employee record.`)) {
+                                  const updatedEmployees = employees.filter(e => e.id !== emp.id);
+                                  setEmployees(updatedEmployees);
+                                  localStorage.setItem('employees', JSON.stringify(updatedEmployees));
+                                  alert('✅ Employee removed successfully');
+                                }
+                              }}
+                              className="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded text-xs font-medium"
+                              title="Remove Employee"
+                            >
+                              🗑️
                             </button>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               emp.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
@@ -410,7 +437,7 @@ export default function HRPage() {
               className="bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
             >
               <span>💰</span>
-              Process Payroll
+              Modify Payroll
             </button>
             <button 
               onClick={() => setShowPerformanceModal(true)}
@@ -438,33 +465,48 @@ export default function HRPage() {
             <form onSubmit={(e) => {
               e.preventDefault();
               
-              // Check if employee has required legal documents
-              const docCheck = checkEmployeeDocuments(formData.employeeId, formData.name);
+              const newEmployee = {
+                id: Date.now().toString(),
+                ...formData,
+                status: 'active',
+                createdAt: new Date().toISOString()
+              };
               
-              if (!docCheck.hasAllRequired) {
-                alert(`❌ Cannot Add Employee - Missing Required Legal Documents!\n\n` +
-                      `Employee: ${formData.name} (${formData.employeeId})\n\n` +
-                      `Missing Documents:\n${docCheck.missingDocs.map(doc => `• ${doc}`).join('\n')}\n\n` +
-                      `Documents uploaded: ${docCheck.uploadedDocs}\n\n` +
-                      `⚠️ Please upload all required documents in the Legal module first:\n` +
-                      `1. NDA (Non-Disclosure Agreement)\n` +
-                      `2. Offer Letter\n` +
-                      `3. Employment Contract\n\n` +
-                      `Then try adding the employee again.`);
-                return;
-              }
+              const updatedEmployees = [...employees, newEmployee];
+              setEmployees(updatedEmployees);
+              localStorage.setItem('employees', JSON.stringify(updatedEmployees));
               
               const proRata = calculateProRata();
               const breakdown = calculatePayrollBreakdown();
-              console.log('New employee:', formData);
-              console.log('Pro-rata calculation:', proRata);
-              console.log('Payroll breakdown:', breakdown);
+              
               alert(`✅ Employee Added Successfully!\n\n` +
                     `Name: ${formData.name}\n` +
-                    `Type: ${formData.employeeType === 'permanent' ? 'Permanent Staff' : 'Contract Staff'}\n` +
-                    `Legal Documents: ✓ All required documents verified\n\n` +
+                    `Type: ${formData.employeeType === 'permanent' ? 'Permanent Staff' : 'Contract Staff'}\n\n` +
                     `${proRata ? `Pro-Rata Info:\nFirst Month Salary: ${formatCurrency(proRata.firstMonthProRata)}\nDays worked in first month: ${proRata.daysWorkedInFirstMonth}/${proRata.daysInFirstMonth} days\n\n` : ''}` +
                     `Monthly Net Pay: ${formatCurrency(breakdown.netPay || breakdown.monthlyGross)}`);
+              
+              // Reset form
+              setFormData({
+                name: '',
+                employeeId: '',
+                role: '',
+                department: '',
+                email: '',
+                phone: '',
+                startDate: '',
+                employeeType: 'permanent',
+                annualGross: '',
+                basicPercent: 15,
+                transportPercent: 15,
+                housingPercent: 15,
+                othersPercent: 55,
+                atmCount: '0',
+                ratePerAtm: '0',
+                hmo: '0',
+                hmoCompany: '0',
+                loan: '0',
+              });
+              
               setShowAddModal(false);
             }}>
               <div className="space-y-6">
@@ -474,31 +516,16 @@ export default function HRPage() {
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Employee Name * {employeesWithDocs.length > 0 && <span className="text-green-600 text-xs">(from Legal)</span>}
+                        Employee Name *
                       </label>
-                      <select
+                      <input
+                        type="text"
                         required
                         value={formData.name}
-                        onChange={(e) => {
-                          const selectedEmployee = employeesWithDocs.find(emp => emp.name === e.target.value);
-                          setFormData({
-                            ...formData, 
-                            name: e.target.value,
-                            employeeId: selectedEmployee?.id || ''
-                          });
-                        }}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                      >
-                        <option value="">Select employee from Legal</option>
-                        {employeesWithDocs.length > 0 ? (
-                          employeesWithDocs.map(emp => (
-                            <option key={emp.id} value={emp.name}>{emp.name} ({emp.id})</option>
-                          ))
-                        ) : (
-                          <option disabled>No employees with documents in Legal</option>
-                        )}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">Upload staff documents in Legal first</p>
+                        placeholder="John Doe"
+                      />
                     </div>
 
                     <div>
@@ -510,9 +537,7 @@ export default function HRPage() {
                         onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
                         placeholder="EMP-001"
-                        readOnly={formData.name !== ''}
                       />
-                      <p className="text-xs text-gray-500 mt-1">Auto-filled from Legal</p>
                     </div>
 
                     <div>
@@ -572,49 +597,6 @@ export default function HRPage() {
                     </div>
                   </div>
 
-                  {/* Legal Documents Status Check */}
-                  {formData.employeeId && formData.name && (() => {
-                    const docCheck = checkEmployeeDocuments(formData.employeeId, formData.name);
-                    return (
-                      <div className={`mt-4 p-3 rounded-lg border ${docCheck.hasAllRequired ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0">
-                            {docCheck.hasAllRequired ? (
-                              <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                            ) : (
-                              <svg className="h-5 w-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                          <div className="ml-3 flex-1">
-                            <h4 className={`text-sm font-semibold ${docCheck.hasAllRequired ? 'text-green-900' : 'text-red-900'}`}>
-                              {docCheck.hasAllRequired ? '✓ Legal Documents Complete' : '⚠️ Missing Required Legal Documents'}
-                            </h4>
-                            <div className="mt-1 text-xs">
-                              {docCheck.hasAllRequired ? (
-                                <p className="text-green-700">
-                                  All required documents uploaded ({docCheck.uploadedDocs} documents total)
-                                </p>
-                              ) : (
-                                <div className="text-red-700">
-                                  <p className="font-medium mb-1">Missing documents:</p>
-                                  <ul className="list-disc list-inside space-y-0.5">
-                                    {docCheck.missingDocs.map((doc, idx) => (
-                                      <li key={idx}>{doc.replace('Staff Document - ', '')}</li>
-                                    ))}
-                                  </ul>
-                                  <p className="mt-2 font-medium">→ Please upload these documents in the Legal module first</p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
                 </div>
 
                 {/* Employment Type & Start Date */}
@@ -990,83 +972,13 @@ export default function HRPage() {
         </div>
       )}
 
-      {/* Payroll Modal */}
+      {/* Nigerian Payroll Management Modal */}
       {showPayrollModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Process Payroll</h2>
-              <button onClick={() => setShowPayrollModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            
-            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="font-semibold text-blue-900 mb-2">Payroll Summary</h3>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <div className="text-blue-700">Total Employees</div>
-                  <div className="text-2xl font-bold text-blue-900">{employees.length}</div>
-                </div>
-                <div>
-                  <div className="text-blue-700">Total Gross Pay</div>
-                  <div className="text-2xl font-bold text-blue-900">
-                    {formatCurrency(employees.reduce((sum, emp) => sum + (emp.monthlyGross || 0), 0))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-blue-700">Total Net Pay</div>
-                  <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(employees.reduce((sum, emp) => sum + (emp.netPay || emp.monthlyGross || 0), 0))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {employees.length > 0 ? (
-                employees.map((emp) => (
-                  <div key={emp.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">{emp.name}</div>
-                        <div className="text-sm text-gray-600">{emp.role} • {emp.department}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-gray-600">Net Pay</div>
-                        <div className="text-lg font-bold text-green-600">
-                          {formatCurrency(emp.netPay || emp.monthlyGross || 0)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-12 text-gray-500">
-                  <p className="text-lg">No employees to process</p>
-                  <p className="text-sm mt-2">Add employees first to process payroll</p>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setShowPayrollModal(false)}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
-              >
-                Close
-              </button>
-              {employees.length > 0 && (
-                <button
-                  onClick={() => {
-                    alert(`Payroll processed for ${employees.length} employees!\n\nTotal: ${formatCurrency(employees.reduce((sum, emp) => sum + (emp.netPay || emp.monthlyGross || 0), 0))}`);
-                  }}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium"
-                >
-                  Process Payroll
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <PayrollManagement 
+          payrolls={payrollSubmissions}
+          onUpdate={handlePayrollUpdate}
+          onClose={() => setShowPayrollModal(false)}
+        />
       )}
 
       {/* Performance Review Modal */}
@@ -1278,10 +1190,10 @@ export default function HRPage() {
                   status: 'active',
                 };
 
-                // Save to legal documents
-                const updatedDocs = [...legalDocuments, newDoc];
-                setLegalDocuments(updatedDocs);
-                localStorage.setItem('legal_documents', JSON.stringify(updatedDocs));
+                // Save to HR staff documents
+                const updatedDocs = [...staffDocuments, newDoc];
+                setStaffDocuments(updatedDocs);
+                localStorage.setItem('hr_staff_documents', JSON.stringify(updatedDocs));
 
                 alert(`✅ Document uploaded successfully!\n\n${category}\n${file.name}`);
                 e.currentTarget.reset();
@@ -1332,14 +1244,14 @@ export default function HRPage() {
             {/* Existing Documents */}
             <div>
               <h3 className="font-semibold text-gray-900 mb-3">Existing Documents ({
-                legalDocuments.filter(doc => 
+                staffDocuments.filter(doc => 
                   doc.employeeId === selectedEmployeeForDocs.employeeId || 
                   doc.employeeName === selectedEmployeeForDocs.name
                 ).length
               })</h3>
               
               <div className="space-y-2">
-                {legalDocuments
+                {staffDocuments
                   .filter(doc => 
                     doc.employeeId === selectedEmployeeForDocs.employeeId || 
                     doc.employeeName === selectedEmployeeForDocs.name
@@ -1374,9 +1286,9 @@ export default function HRPage() {
                           <button
                             onClick={() => {
                               if (confirm(`Delete this document?\n\n${doc.category}\n${doc.fileName}`)) {
-                                const updatedDocs = legalDocuments.filter(d => d.id !== doc.id);
-                                setLegalDocuments(updatedDocs);
-                                localStorage.setItem('legal_documents', JSON.stringify(updatedDocs));
+                                const updatedDocs = staffDocuments.filter(d => d.id !== doc.id);
+                                setStaffDocuments(updatedDocs);
+                                localStorage.setItem('hr_staff_documents', JSON.stringify(updatedDocs));
                                 alert('Document deleted');
                               }
                             }}
@@ -1389,7 +1301,7 @@ export default function HRPage() {
                     </div>
                   ))}
                 
-                {legalDocuments.filter(doc => 
+                {staffDocuments.filter(doc => 
                   doc.employeeId === selectedEmployeeForDocs.employeeId || 
                   doc.employeeName === selectedEmployeeForDocs.name
                 ).length === 0 && (
@@ -1407,6 +1319,676 @@ export default function HRPage() {
                   setShowDocumentModal(false);
                   setSelectedEmployeeForDocs(null);
                 }}
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Employee Detail Modal */}
+      {showEmployeeDetailModal && selectedEmployee && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-gray-900">Employee Details</h2>
+              <button 
+                onClick={() => {
+                  setShowEmployeeDetailModal(false);
+                  setSelectedEmployee(null);
+                }} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Profile Section */}
+              <div className="flex items-start gap-4 pb-6 border-b">
+                <div className="h-20 w-20 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-2xl">
+                  {selectedEmployee.name.split(' ').map((n: string) => n[0]).join('')}
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-900">{selectedEmployee.name}</h3>
+                  <p className="text-gray-600">{selectedEmployee.role}</p>
+                  <div className="flex gap-2 mt-2">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      selectedEmployee.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {selectedEmployee.status?.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Basic Information */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Basic Information</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-gray-600">Employee ID</label>
+                    <p className="font-medium text-gray-900">{selectedEmployee.employeeId}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Department</label>
+                    <p className="font-medium text-gray-900">{selectedEmployee.department}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Email</label>
+                    <p className="font-medium text-gray-900">{selectedEmployee.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Phone</label>
+                    <p className="font-medium text-gray-900">{selectedEmployee.phone || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Start Date</label>
+                    <p className="font-medium text-gray-900">
+                      {selectedEmployee.startDate ? new Date(selectedEmployee.startDate).toLocaleDateString() : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Employment Type</label>
+                    <p className="font-medium text-gray-900">
+                      {selectedEmployee.employeeType === 'permanent' ? 'Permanent Staff' : 'Contract Staff'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Salary Information */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Salary Information</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedEmployee.employeeType === 'permanent' ? (
+                    <>
+                      <div>
+                        <label className="text-sm text-gray-600">Annual Gross</label>
+                        <p className="font-medium text-gray-900">
+                          {formatCurrency(parseFloat(selectedEmployee.annualGross || 0))}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-600">Monthly Gross</label>
+                        <p className="font-medium text-gray-900">
+                          {formatCurrency(parseFloat(selectedEmployee.annualGross || 0) / 12)}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-600">Basic Salary</label>
+                        <p className="font-medium text-gray-900">
+                          {selectedEmployee.basicPercent}% - {formatCurrency((parseFloat(selectedEmployee.annualGross || 0) / 12) * (selectedEmployee.basicPercent / 100))}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-600">Housing</label>
+                        <p className="font-medium text-gray-900">
+                          {selectedEmployee.housingPercent}% - {formatCurrency((parseFloat(selectedEmployee.annualGross || 0) / 12) * (selectedEmployee.housingPercent / 100))}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-600">Transport</label>
+                        <p className="font-medium text-gray-900">
+                          {selectedEmployee.transportPercent}% - {formatCurrency((parseFloat(selectedEmployee.annualGross || 0) / 12) * (selectedEmployee.transportPercent / 100))}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-600">Other Allowances</label>
+                        <p className="font-medium text-gray-900">
+                          {selectedEmployee.othersPercent}% - {formatCurrency((parseFloat(selectedEmployee.annualGross || 0) / 12) * (selectedEmployee.othersPercent / 100))}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="text-sm text-gray-600">ATM Count</label>
+                        <p className="font-medium text-gray-900">{selectedEmployee.atmCount || 0}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-600">Rate per ATM</label>
+                        <p className="font-medium text-gray-900">
+                          {formatCurrency(parseFloat(selectedEmployee.ratePerAtm || 0))}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-600">Monthly Pay</label>
+                        <p className="font-medium text-gray-900">
+                          {formatCurrency((parseFloat(selectedEmployee.atmCount || 0)) * (parseFloat(selectedEmployee.ratePerAtm || 0)))}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Deductions */}
+              {(selectedEmployee.hmo || selectedEmployee.loan) && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">Deductions</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedEmployee.hmo && (
+                      <div>
+                        <label className="text-sm text-gray-600">HMO (Employee)</label>
+                        <p className="font-medium text-gray-900">
+                          {formatCurrency(parseFloat(selectedEmployee.hmo))}
+                        </p>
+                      </div>
+                    )}
+                    {selectedEmployee.loan && (
+                      <div>
+                        <label className="text-sm text-gray-600">Loan</label>
+                        <p className="font-medium text-gray-900">
+                          {formatCurrency(parseFloat(selectedEmployee.loan))}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Documents */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Documents</h4>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setSelectedEmployeeForDocs(selectedEmployee);
+                      setShowEmployeeDetailModal(false);
+                      setShowDocumentModal(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded text-sm font-medium"
+                  >
+                    📎 View/Upload Documents ({staffDocuments.filter(doc => 
+                      doc.employeeId === selectedEmployee.employeeId || doc.employeeName === selectedEmployee.name
+                    ).length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  onClick={() => {
+                    setFormData(selectedEmployee);
+                    setShowEmployeeDetailModal(false);
+                    setShowEditEmployeeModal(true);
+                  }}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded font-medium"
+                >
+                  ✏️ Edit Employee
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm(`Remove employee: ${selectedEmployee.name}?\n\nThis will permanently delete the employee record.`)) {
+                      const updatedEmployees = employees.filter(e => e.id !== selectedEmployee.id);
+                      setEmployees(updatedEmployees);
+                      localStorage.setItem('employees', JSON.stringify(updatedEmployees));
+                      setShowEmployeeDetailModal(false);
+                      setSelectedEmployee(null);
+                      alert('✅ Employee removed successfully');
+                    }
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded font-medium"
+                >
+                  🗑️ Remove
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEmployeeDetailModal(false);
+                    setSelectedEmployee(null);
+                  }}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Employee Modal */}
+      {showEditEmployeeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit Employee</h2>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              
+              const updatedEmployee = {
+                ...formData,
+                id: selectedEmployee.id,
+                status: selectedEmployee.status,
+                createdAt: selectedEmployee.createdAt,
+                updatedAt: new Date().toISOString()
+              };
+              
+              const updatedEmployees = employees.map(emp => 
+                emp.id === selectedEmployee.id ? updatedEmployee : emp
+              );
+              
+              setEmployees(updatedEmployees);
+              localStorage.setItem('employees', JSON.stringify(updatedEmployees));
+              
+              const proRata = calculateProRata();
+              const breakdown = calculatePayrollBreakdown();
+              
+              alert(`✅ Employee Updated Successfully!\n\n` +
+                    `Name: ${formData.name}\n` +
+                    `Type: ${formData.employeeType === 'permanent' ? 'Permanent Staff' : 'Contract Staff'}\n\n` +
+                    `${proRata ? `Pro-Rata Info:\nFirst Month Salary: ${formatCurrency(proRata.firstMonthProRata)}\nDays worked in first month: ${proRata.daysWorkedInFirstMonth}/${proRata.daysInFirstMonth} days\n\n` : ''}` +
+                    `Monthly Net Pay: ${formatCurrency(breakdown.netPay || breakdown.monthlyGross)}`);
+              
+              setShowEditEmployeeModal(false);
+              setSelectedEmployee(null);
+            }}>
+              <div className="space-y-6">
+                {/* Basic Information */}
+                <div className="border-b pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Basic Information</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Employee Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        placeholder="John Doe"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID *</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.employeeId}
+                        onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        placeholder="EMP-001"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.role}
+                        onChange={(e) => setFormData({...formData, role: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        placeholder="Senior Engineer"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
+                      <select
+                        value={formData.department}
+                        onChange={(e) => setFormData({...formData, department: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        required
+                      >
+                        <option value="">Select department</option>
+                        <option value="Operations">Operations</option>
+                        <option value="Technology">Technology</option>
+                        <option value="Sales">Sales</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Finance">Finance</option>
+                        <option value="HR">HR</option>
+                        <option value="Legal">Legal</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        placeholder="john@company.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        placeholder="+234 xxx xxx xxxx"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Employment Type & Start Date */}
+                <div className="border-b pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Employment Details</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employment Type *</label>
+                      <select
+                        value={formData.employeeType}
+                        onChange={(e) => setFormData({...formData, employeeType: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        required
+                      >
+                        <option value="permanent">Permanent Staff</option>
+                        <option value="contract">Contract Staff</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Salary Information */}
+                {formData.employeeType === 'permanent' ? (
+                  <div className="border-b pb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Salary Information (Permanent Staff)</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Annual Gross Salary (₦) *</label>
+                        <input
+                          type="number"
+                          required
+                          value={formData.annualGross}
+                          onChange={(e) => setFormData({...formData, annualGross: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                          placeholder="12000000"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Basic Salary %</label>
+                        <input
+                          type="number"
+                          value={formData.basicPercent}
+                          onChange={(e) => setFormData({...formData, basicPercent: parseFloat(e.target.value)})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Transport %</label>
+                        <input
+                          type="number"
+                          value={formData.transportPercent}
+                          onChange={(e) => setFormData({...formData, transportPercent: parseFloat(e.target.value)})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Housing %</label>
+                        <input
+                          type="number"
+                          value={formData.housingPercent}
+                          onChange={(e) => setFormData({...formData, housingPercent: parseFloat(e.target.value)})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Other Allowances %</label>
+                        <input
+                          type="number"
+                          value={formData.othersPercent}
+                          onChange={(e) => setFormData({...formData, othersPercent: parseFloat(e.target.value)})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-b pb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Payment Information (Contract Staff)</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Number of ATMs *</label>
+                        <input
+                          type="number"
+                          required
+                          value={formData.atmCount}
+                          onChange={(e) => setFormData({...formData, atmCount: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                          placeholder="10"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Rate per ATM (₦) *</label>
+                        <input
+                          type="number"
+                          required
+                          value={formData.ratePerAtm}
+                          onChange={(e) => setFormData({...formData, ratePerAtm: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                          placeholder="50000"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Deductions */}
+                <div className="border-b pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Deductions</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">HMO (Employee) (₦)</label>
+                      <input
+                        type="number"
+                        value={formData.hmo}
+                        onChange={(e) => setFormData({...formData, hmo: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">HMO (Company) (₦)</label>
+                      <input
+                        type="number"
+                        value={formData.hmoCompany}
+                        onChange={(e) => setFormData({...formData, hmoCompany: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Loan Deduction (₦)</label>
+                      <input
+                        type="number"
+                        value={formData.loan}
+                        onChange={(e) => setFormData({...formData, loan: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-medium"
+                  >
+                    Update Employee
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditEmployeeModal(false);
+                      setSelectedEmployee(null);
+                    }}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 px-6 rounded-lg font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Employee List Modal */}
+      {showEmployeeListModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                {employeeListFilter === 'all' && 'All Employees'}
+                {employeeListFilter === 'onLeave' && 'Employees On Leave'}
+                {employeeListFilter === 'departments' && 'Employees by Department'}
+              </h2>
+              <button 
+                onClick={() => setShowEmployeeListModal(false)} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {employeeListFilter === 'all' && (
+                <>
+                  {employees.length > 0 ? (
+                    employees.map((emp) => (
+                      <div key={emp.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                              {emp.name.split(' ').map((n: string) => n[0]).join('')}
+                            </div>
+                            <div className="ml-4">
+                              <div className="font-medium text-gray-900">{emp.name}</div>
+                              <div className="text-sm text-gray-500">{emp.role} · {emp.department}</div>
+                              <div className="text-xs text-gray-500 mt-1">ID: {emp.employeeId}</div>
+                            </div>
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            emp.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {emp.status?.toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-500 py-8">No employees found</p>
+                  )}
+                </>
+              )}
+
+              {employeeListFilter === 'onLeave' && (
+                <>
+                  {employees.filter(emp => emp.status === 'onLeave').length > 0 ? (
+                    employees.filter(emp => emp.status === 'onLeave').map((emp) => (
+                      <div key={emp.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className="h-12 w-12 rounded-full bg-orange-600 flex items-center justify-center text-white font-semibold">
+                              {emp.name.split(' ').map((n: string) => n[0]).join('')}
+                            </div>
+                            <div className="ml-4">
+                              <div className="font-medium text-gray-900">{emp.name}</div>
+                              <div className="text-sm text-gray-500">{emp.role} · {emp.department}</div>
+                              <div className="text-xs text-orange-600 mt-1">On Leave</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-500 py-8">No employees on leave</p>
+                  )}
+                </>
+              )}
+
+              {employeeListFilter === 'departments' && (
+                <>
+                  {Object.entries(
+                    employees.reduce((acc: any, emp) => {
+                      const dept = emp.department || 'Unassigned';
+                      if (!acc[dept]) acc[dept] = [];
+                      acc[dept].push(emp);
+                      return acc;
+                    }, {})
+                  ).map(([dept, deptEmployees]: [string, any]) => (
+                    <div key={dept} className="mb-6">
+                      <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                          {dept} ({deptEmployees.length})
+                        </span>
+                      </h3>
+                      <div className="space-y-2 ml-4">
+                        {deptEmployees.map((emp: any) => (
+                          <div key={emp.id} className="border rounded-lg p-3 hover:bg-gray-50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm">
+                                  {emp.name.split(' ').map((n: string) => n[0]).join('')}
+                                </div>
+                                <div className="ml-3">
+                                  <div className="font-medium text-gray-900">{emp.name}</div>
+                                  <div className="text-xs text-gray-500">{emp.role}</div>
+                                </div>
+                              </div>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                emp.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {emp.status?.toUpperCase()}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {employees.length === 0 && (
+                    <p className="text-center text-gray-500 py-8">No employees found</p>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={() => setShowEmployeeListModal(false)}
                 className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
               >
                 Close

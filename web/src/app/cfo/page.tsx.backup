@@ -32,25 +32,11 @@ export default function FinancePage() {
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [showProcurementModal, setShowProcurementModal] = useState(false);
-  const [showCashFlowModal, setShowCashFlowModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [payrollSubmissions, setPayrollSubmissions] = useState<PayrollSubmission[]>([]);
   const [procurementRequests, setProcurementRequests] = useState<any[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
   
-  // Load assets from localStorage
-  useEffect(() => {
-    const savedAssets = localStorage.getItem('company_assets');
-    if (savedAssets) {
-      try {
-        setAssets(JSON.parse(savedAssets));
-      } catch (e) {
-        console.error('Error loading assets:', e);
-      }
-    }
-  }, []);
-
   // Load payroll submissions from localStorage
   useEffect(() => {
     const savedPayrolls = localStorage.getItem('payroll_submissions');
@@ -673,68 +659,31 @@ export default function FinancePage() {
       console.log('Sending to:', emailData.to);
       console.log('Invoice payload:', invoicePayload);
 
-      // Try to send via backend, with fallback
-      try {
-        const response = await fetch('http://localhost:5000/api/v1/email/send-invoice', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            to: emailData.to,
-            subject: emailData.subject,
-            message: emailData.message,
-            invoice: invoicePayload,
-          }),
-        });
+      const response = await fetch('http://localhost:5000/api/v1/email/send-invoice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          to: emailData.to,
+          subject: emailData.subject,
+          message: emailData.message,
+          invoice: invoicePayload,
+        }),
+      });
 
-        console.log('Response status:', response.status);
-        const data = await response.json();
-        console.log('Response data:', data);
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
 
-        if (data.success) {
-          alert(`✅ Invoice sent successfully to ${emailData.to}${data.previewUrl ? '\n\nPreview URL (for testing): ' + data.previewUrl : ''}`);
-          setShowEmailModal(false);
-          setSelectedInvoice(null);
-          setEmailData({ to: '', subject: '', message: '' });
-        } else {
-          throw new Error(data.message || data.error || 'Failed to send email');
-        }
-      } catch (fetchError) {
-        // Backend not available - show email preview instead
-        console.warn('Email backend not available, showing preview:', fetchError);
-        
-        const emailPreview = `
-📧 EMAIL PREVIEW (Backend not running)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-TO: ${emailData.to}
-SUBJECT: ${emailData.subject}
-
-MESSAGE:
-${emailData.message}
-
-INVOICE DETAILS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Invoice #: ${invoicePayload.invoiceNumber}
-Client: ${invoicePayload.client}
-Amount: ${formatCurrency(invoicePayload.amount)}
-Issue Date: ${new Date(invoicePayload.issueDate).toLocaleDateString()}
-Due Date: ${new Date(invoicePayload.dueDate).toLocaleDateString()}
-
-⚠️ NOTE: Email backend is not running. To send actual emails:
-1. Start the backend server: npm run dev (in backend folder)
-2. Or copy the above content and send manually
-
-The invoice has been saved in the system.
-        `;
-        
-        alert(emailPreview);
+      if (data.success) {
+        alert(`Invoice sent successfully to ${emailData.to}${data.previewUrl ? '\n\nPreview URL (for testing): ' + data.previewUrl : ''}`);
         setShowEmailModal(false);
         setSelectedInvoice(null);
         setEmailData({ to: '', subject: '', message: '' });
-      }
+      } else {
+        alert(`Failed to send email: ${data.message || data.error}`);
       }
     } catch (error: any) {
       console.error('Error sending invoice email:', error);
@@ -768,27 +717,17 @@ The invoice has been saved in the system.
 
   const clients = getClientsWithLegalDocs();
 
-  // Calculate asset values
-  const totalAssetValue = assets.reduce((sum, asset) => sum + (asset.currentValue * asset.quantity), 0);
-  const totalAssetPurchase = assets.reduce((sum, asset) => sum + (asset.purchasePrice * asset.quantity), 0);
-  const assetAppreciation = totalAssetValue - totalAssetPurchase;
-
   // Calculate financial metrics from actual data
   const totalRevenue = revenues.reduce((sum, rev) => sum + rev.amount, 0);
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
   const netProfit = totalRevenue - totalExpenses;
   const cashFlow = currentBalance - lastBalance;
-  
-  // Total equity = Cash + Assets - Liabilities
-  const totalEquity = currentBalance + totalAssetValue;
 
   const financialMetrics = [
     { label: 'Total Revenue', value: formatCurrency(totalRevenue), change: '0%', trend: 'up' },
     { label: 'Operating Costs', value: formatCurrency(totalExpenses), change: '0%', trend: 'up' },
     { label: 'Net Profit', value: formatCurrency(netProfit), change: '0%', trend: netProfit >= 0 ? 'up' : 'down' },
     { label: 'Cash Flow', value: formatCurrency(cashFlow), change: '0%', trend: cashFlow >= 0 ? 'up' : 'down' },
-    { label: 'Total Assets', value: formatCurrency(totalAssetValue), change: '0%', trend: 'up', subtitle: `${assets.length} assets` },
-    { label: 'Total Equity', value: formatCurrency(totalEquity), change: '0%', trend: 'up', subtitle: 'Cash + Assets' },
   ];
 
   const revenueStreams: any[] = [];
@@ -850,7 +789,7 @@ The invoice has been saved in the system.
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 mt-6">
           {/* Financial Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             {financialMetrics.map((metric) => (
               <div key={metric.label} className="bg-white rounded-lg shadow p-6">
                 <div className="text-sm font-medium text-gray-600">{metric.label}</div>
@@ -860,9 +799,6 @@ The invoice has been saved in the system.
                     {metric.change}
                   </div>
                 </div>
-                {(metric as any).subtitle && (
-                  <div className="text-xs text-gray-500 mt-1">{(metric as any).subtitle}</div>
-                )}
               </div>
             ))}
           </div>
@@ -939,120 +875,13 @@ The invoice has been saved in the system.
             </div>
           </div>
 
-          {/* Assets Summary Section */}
-          <div className="mt-6 bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Company Assets</h3>
-                <p className="text-sm text-gray-600">Total asset portfolio value</p>
-              </div>
-              <a 
-                href="/assets"
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-              >
-                View All Assets →
-              </a>
-            </div>
-            
-            {assets.length > 0 ? (
-              <div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="text-sm text-blue-600 font-medium">Total Assets</div>
-                    <div className="text-2xl font-bold text-blue-700 mt-1">{assets.length}</div>
-                    <div className="text-xs text-blue-600 mt-1">Items tracked</div>
-                  </div>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="text-sm text-green-600 font-medium">Current Value</div>
-                    <div className="text-2xl font-bold text-green-700 mt-1">{formatCurrency(totalAssetValue)}</div>
-                    <div className="text-xs text-green-600 mt-1">Market value</div>
-                  </div>
-                  <div className={`border rounded-lg p-4 ${assetAppreciation >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                    <div className={`text-sm font-medium ${assetAppreciation >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      Appreciation
-                    </div>
-                    <div className={`text-2xl font-bold mt-1 ${assetAppreciation >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                      {formatCurrency(assetAppreciation)}
-                    </div>
-                    <div className={`text-xs mt-1 ${assetAppreciation >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {((assetAppreciation / totalAssetPurchase) * 100).toFixed(1)}% change
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asset Name</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Purchase Value</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Current Value</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Change</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {assets.slice(0, 5).map((asset: any) => {
-                        const change = ((asset.currentValue - asset.purchasePrice) / asset.purchasePrice * 100);
-                        return (
-                          <tr key={asset.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{asset.name}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{asset.assetClass}</td>
-                            <td className="px-4 py-3 text-sm text-right text-gray-900">
-                              {formatCurrency(asset.purchasePrice * asset.quantity)}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
-                              {formatCurrency(asset.currentValue * asset.quantity)}
-                            </td>
-                            <td className={`px-4 py-3 text-sm text-right font-medium ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {change >= 0 ? '+' : ''}{change.toFixed(1)}%
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                
-                {assets.length > 5 && (
-                  <div className="mt-4 text-center">
-                    <a 
-                      href="/assets"
-                      className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                    >
-                      View all {assets.length} assets →
-                    </a>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-4xl mb-2">🏢</div>
-                <p className="text-sm">No assets tracked yet</p>
-                <a 
-                  href="/assets"
-                  className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-2 inline-block"
-                >
-                  Add your first asset →
-                </a>
-              </div>
-            )}
-          </div>
-
           {/* Quick Actions */}
           <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <button 
-              onClick={() => alert('P&L Report feature coming soon!')}
-              className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg text-sm font-medium"
-            >
-              P&L Report
-            </button>
-            <button 
-              onClick={() => setShowCashFlowModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg text-sm font-medium"
-            >
-              Cash Flow
-            </button>
+            {['P&L Report', 'Cash Flow'].map((action) => (
+              <button key={action} className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg text-sm font-medium">
+                {action}
+              </button>
+            ))}
             <button 
               onClick={() => setShowBudgetModal(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg text-sm font-medium"
@@ -1744,116 +1573,548 @@ The invoice has been saved in the system.
         />
       )}
 
-      {/* Cash Flow Modal */}
-      {showCashFlowModal && (
+      {/* Budget Review Modal */}
+      {showBudgetModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 sticky top-0 bg-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Cash Flow Statement</h2>
-                  <p className="text-sm text-gray-600 mt-1">Track money in and out of your business</p>
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Budget Review</h2>
+              <button onClick={() => setShowBudgetModal(false)} className="text-gray-500 hover:text-gray-700">
+                <span className="text-2xl">×</span>
+              </button>
+            </div>
+            <p className="text-gray-600">Budget review module coming soon...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Procurement Approval Modal */}
+                const breakdown = calculatePayrollBreakdown(emp);
+                return sum + breakdown.netPay;
+              }, 0);
+
+              // Get payment details from form
+              const formData = new FormData(e.currentTarget);
+              const paymentDate = formData.get('paymentDate');
+              const paymentMonth = formData.get('paymentMonth');
+              const paymentMethod = formData.get('paymentMethod');
+
+              const payrollDetails = validEmployees.map((emp, idx) => {
+                const breakdown = calculatePayrollBreakdown(emp);
+                return {
+                  sn: idx + 1,
+                  ...emp,
+                  ...breakdown
+                };
+              });
+
+              console.log('Batch Payroll processed:', {
+                employees: payrollDetails,
+                totalAmount: totalPayroll,
+                paymentDate,
+                paymentMonth,
+                paymentMethod,
+                count: validEmployees.length
+              });
+
+              alert(`Batch Payroll Processed Successfully!\n\nEmployees: ${validEmployees.length}\nTotal Net Pay: ${formatCurrency(totalPayroll)}\n\nPayroll expense has been recorded.`);
+              
+              // Reset employees list
+              setPayrollEmployees([{
+                id: Date.now(),
+                employeeType: 'permanent',
+                employeeName: '',
+                employeeId: '',
+                jobTitle: '',
+                annualGross: '',
+                basicPercent: 15,
+                transportPercent: 15,
+                housingPercent: 15,
+                othersPercent: 55,
+                atmCount: '0',
+                ratePerAtm: '0',
+                hmo: '0',
+                hmoCompany: '0',
+                loan: '0',
+                penalty: '0',
+              }]);
+              
+              setShowPayrollModal(false);
+            }}>
+              <div className="space-y-4">
+                {/* Employee List */}
+                <div className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Employees ({payrollEmployees.length})</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayrollEmployees([...payrollEmployees, {
+                          id: Date.now(),
+                          employeeType: 'permanent',
+                          employeeName: '',
+                          employeeId: '',
+                          jobTitle: '',
+                          annualGross: '',
+                          basicPercent: 15,
+                          transportPercent: 15,
+                          housingPercent: 15,
+                          othersPercent: 55,
+                          atmCount: '0',
+                          ratePerAtm: '0',
+                          hmo: '0',
+                          hmoCompany: '0',
+                          loan: '0',
+                          penalty: '0',
+                        }]);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium"
+                    >
+                      + Add Employee
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                    {payrollEmployees.map((employee, index) => (
+                      <div key={employee.id} className="bg-white border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-sm font-medium text-gray-700">Employee #{index + 1}</span>
+                          {payrollEmployees.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPayrollEmployees(payrollEmployees.filter((_, i) => i !== index));
+                              }}
+                              className="text-red-600 hover:text-red-800 text-sm"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-5 gap-3 mb-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Employee Type *</label>
+                            <select
+                              value={employee.employeeType}
+                              disabled={employee.employeeName !== ''}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                updated[index].employeeType = e.target.value;
+                                setPayrollEmployees(updated);
+                              }}
+                              className={`w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 ${employee.employeeName ? 'bg-gray-100 text-gray-700' : 'bg-white text-gray-900'}`}
+                            >
+                              <option value="permanent">Permanent Staff</option>
+                              <option value="contract">Contract Staff (Field Engineer)</option>
+                            </select>
+                            {employee.employeeName && (
+                              <p className="text-[9px] text-gray-500 mt-0.5">Auto-filled from HR</p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Employee Name *</label>
+                            <select
+                              value={employee.employeeName}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                const selectedName = e.target.value;
+                                updated[index].employeeName = selectedName;
+                                
+                                // Auto-fill employee details from HR data
+                                if (selectedName) {
+                                  const hrEmployee = hrEmployees.find(emp => emp.name === selectedName);
+                                  if (hrEmployee) {
+                                    updated[index].employeeId = hrEmployee.employeeId;
+                                    updated[index].jobTitle = hrEmployee.role;
+                                    updated[index].employeeType = hrEmployee.type;
+                                  }
+                                }
+                                
+                                setPayrollEmployees(updated);
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                            >
+                              <option value="">-- Select Employee --</option>
+                              {hrEmployees
+                                .filter(emp => emp.status === 'active')
+                                .map(emp => (
+                                  <option key={emp.id} value={emp.name}>
+                                    {emp.name} ({emp.role})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Employee ID *</label>
+                            <input
+                              type="text"
+                              value={employee.employeeId}
+                              readOnly
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-gray-100 text-gray-700"
+                              placeholder="Auto-filled"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Job Title *</label>
+                            <input
+                              type="text"
+                              value={employee.jobTitle}
+                              readOnly
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-gray-100 text-gray-700"
+                              placeholder="Auto-filled"
+                            />
+                          </div>
+
+                          {employee.employeeType === 'permanent' ? (
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Annual Gross ({currencySymbol}) *</label>
+                              <input
+                                type="number"
+                                value={employee.annualGross}
+                                onChange={(e) => {
+                                  const updated = [...payrollEmployees];
+                                  updated[index].annualGross = e.target.value;
+                                  setPayrollEmployees(updated);
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                                placeholder="1800000"
+                              />
+                            </div>
+                          ) : (
+                            <div className="col-span-1"></div>
+                          )}
+                        </div>
+
+                        {/* Contract Staff: ATM-based Payment */}
+                        {employee.employeeType === 'contract' && (
+                          <div className="grid grid-cols-3 gap-3 mb-3 bg-blue-50 p-3 rounded">
+                            <div>
+                              <label className="block text-xs font-medium text-blue-900 mb-1">Number of ATMs *</label>
+                              <input
+                                type="number"
+                                value={employee.atmCount}
+                                onChange={(e) => {
+                                  const updated = [...payrollEmployees];
+                                  updated[index].atmCount = e.target.value;
+                                  setPayrollEmployees(updated);
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                                placeholder="10"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-blue-900 mb-1">Rate per ATM ({currencySymbol}) *</label>
+                              <input
+                                type="number"
+                                value={employee.ratePerAtm}
+                                onChange={(e) => {
+                                  const updated = [...payrollEmployees];
+                                  updated[index].ratePerAtm = e.target.value;
+                                  setPayrollEmployees(updated);
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                                placeholder="15000"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-blue-900 mb-1">Monthly Total</label>
+                              <div className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded bg-blue-100 text-blue-900 font-semibold">
+                                {formatCurrency((parseFloat(employee.atmCount) || 0) * (parseFloat(employee.ratePerAtm) || 0))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Additional Deductions Row */}
+                        <div className="grid grid-cols-4 gap-3 mb-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">HMO ({currencySymbol})</label>
+                            <input
+                              type="number"
+                              value={employee.hmo}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                updated[index].hmo = e.target.value;
+                                setPayrollEmployees(updated);
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">HMO Company ({currencySymbol})</label>
+                            <input
+                              type="number"
+                              value={employee.hmoCompany}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                updated[index].hmoCompany = e.target.value;
+                                setPayrollEmployees(updated);
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Loan ({currencySymbol})</label>
+                            <input
+                              type="number"
+                              value={employee.loan}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                updated[index].loan = e.target.value;
+                                setPayrollEmployees(updated);
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Penalty ({currencySymbol})</label>
+                            <input
+                              type="number"
+                              value={employee.penalty}
+                              onChange={(e) => {
+                                const updated = [...payrollEmployees];
+                                updated[index].penalty = e.target.value;
+                                setPayrollEmployees(updated);
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Payroll Breakdown Display */}
+                        {((employee.employeeType === 'permanent' && employee.annualGross && parseFloat(employee.annualGross) > 0) ||
+                          (employee.employeeType === 'contract' && employee.atmCount && employee.ratePerAtm)) && (() => {
+                          const breakdown = calculatePayrollBreakdown(employee);
+                          
+                          if (employee.employeeType === 'contract') {
+                            // CONTRACT STAFF BREAKDOWN
+                            return (
+                              <div className="mt-3 pt-3 border-t bg-blue-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
+                                <p className="text-xs font-semibold text-blue-900 mb-2">Contract Staff Payment (Per ATM)</p>
+                                <div className="grid grid-cols-4 gap-3 text-xs">
+                                  <div>
+                                    <span className="text-blue-700 block">ATM Machines:</span>
+                                    <p className="font-semibold text-blue-900">{breakdown.atmCount} units</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-blue-700 block">Rate per ATM:</span>
+                                    <p className="font-semibold text-blue-900">{formatCurrency(breakdown.ratePerAtm)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-blue-700 block">Monthly Gross:</span>
+                                    <p className="font-semibold text-blue-900">{formatCurrency(breakdown.monthlyGross)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-blue-700 block">Deductions:</span>
+                                    <p className="font-semibold text-red-600">{formatCurrency(breakdown.totalDeductions)}</p>
+                                  </div>
+                                </div>
+                                <div className="mt-2 pt-2 border-t border-blue-200">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm font-semibold text-blue-900">Net Pay:</span>
+                                    <span className="text-lg font-bold text-green-600">{formatCurrency(breakdown.netPay)}</span>
+                                  </div>
+                                  <p className="text-[9px] text-blue-700 mt-1">*Contract staff handle their own tax obligations</p>
+                                </div>
+                              </div>
+                            );
+                          } else {
+                            // PERMANENT STAFF BREAKDOWN
+                            return (
+                              <div className="mt-3 pt-3 border-t bg-gray-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
+                                <p className="text-xs font-semibold text-gray-900 mb-2">Permanent Staff Breakdown (Nigerian Tax Structure)</p>
+                                <div className="grid grid-cols-6 gap-2 text-xs">
+                                  <div>
+                                    <span className="text-gray-600 block">Monthly Gross:</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.monthlyGross)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Basic (15%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.basic)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Transport (15%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.transport)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Housing (15%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.housing)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Others (55%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.others)}</p>
+                                    <p className="text-[9px] text-gray-500 mt-0.5">Meal, entertainment, utility, medical & other allowances</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">CRA:</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.craMonthly)}</p>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-6 gap-2 text-xs mt-2">
+                                  <div>
+                                    <span className="text-gray-600 block">Pension (8%):</span>
+                                    <p className="font-semibold text-red-600">{formatCurrency(breakdown.pensionEmployee)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Employer (10%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.pensionEmployer)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Taxable Pay:</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.taxablePay)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Tax Due (PAYE):</span>
+                                    <p className="font-semibold text-red-600">{formatCurrency(breakdown.taxDue)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">WHT (5%):</span>
+                                    <p className="font-semibold text-gray-900">{formatCurrency(breakdown.wht)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 block">Net Pay:</span>
+                                    <p className="font-bold text-green-600 text-sm">{formatCurrency(breakdown.netPay)}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <button onClick={() => setShowCashFlowModal(false)} className="text-gray-500 hover:text-gray-700">
-                  <span className="text-2xl">×</span>
+
+                {/* Payment Details */}
+                <div className="grid grid-cols-3 gap-4 border-t pt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Month</label>
+                    <input
+                      type="month"
+                      name="paymentMonth"
+                      required
+                      defaultValue={new Date().toISOString().slice(0, 7)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+                    <input
+                      type="date"
+                      name="paymentDate"
+                      required
+                      defaultValue={new Date().toISOString().split('T')[0]}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                    <select
+                      name="paymentMethod"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    >
+                      <option value="Bank Transfer">Bank Transfer</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Cheque">Cheque</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Total Summary */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-xs text-blue-700">Employees</p>
+                      <p className="text-lg font-bold text-blue-900">
+                        {payrollEmployees.filter(e => {
+                          if (!e.employeeName) return false;
+                          if (e.employeeType === 'contract') {
+                            return e.atmCount && e.ratePerAtm;
+                          }
+                          return e.annualGross;
+                        }).length}
+                      </p>
+                      <p className="text-[9px] text-blue-600">
+                        {payrollEmployees.filter(e => e.employeeType === 'permanent' && e.annualGross).length} permanent, {' '}
+                        {payrollEmployees.filter(e => e.employeeType === 'contract' && e.atmCount && e.ratePerAtm).length} contract
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-700">Total Gross Pay</p>
+                      <p className="text-lg font-bold text-blue-900">
+                        {formatCurrency(
+                          payrollEmployees.reduce((sum, emp) => {
+                            if (!emp.employeeName) return sum;
+                            if (emp.employeeType === 'contract' && (!emp.atmCount || !emp.ratePerAtm)) return sum;
+                            if (emp.employeeType === 'permanent' && (!emp.annualGross || parseFloat(emp.annualGross) === 0)) return sum;
+                            const breakdown = calculatePayrollBreakdown(emp);
+                            return sum + breakdown.monthlyGross;
+                          }, 0)
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-700">Total Deductions</p>
+                      <p className="text-lg font-bold text-red-600">
+                        {formatCurrency(
+                          payrollEmployees.reduce((sum, emp) => {
+                            if (!emp.employeeName) return sum;
+                            if (emp.employeeType === 'contract' && (!emp.atmCount || !emp.ratePerAtm)) return sum;
+                            if (emp.employeeType === 'permanent' && (!emp.annualGross || parseFloat(emp.annualGross) === 0)) return sum;
+                            const breakdown = calculatePayrollBreakdown(emp);
+                            return sum + breakdown.totalDeductions;
+                          }, 0)
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-700">Total Net Pay</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {formatCurrency(
+                          payrollEmployees.reduce((sum, emp) => {
+                            if (!emp.employeeName) return sum;
+                            if (emp.employeeType === 'contract' && (!emp.atmCount || !emp.ratePerAtm)) return sum;
+                            if (emp.employeeType === 'permanent' && (!emp.annualGross || parseFloat(emp.annualGross) === 0)) return sum;
+                            const breakdown = calculatePayrollBreakdown(emp);
+                            return sum + breakdown.netPay;
+                          }, 0)
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPayrollModal(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
+                >
+                  Process Batch Payroll
                 </button>
               </div>
-            </div>
-
-            <div className="p-6">
-              {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="text-sm text-green-600 font-medium">Cash Inflows</div>
-                  <div className="text-2xl font-bold text-green-700 mt-1">
-                    {formatCurrency(revenues.reduce((sum, rev) => sum + rev.amount, 0))}
-                  </div>
-                  <div className="text-xs text-green-600 mt-1">{revenues.length} transactions</div>
-                </div>
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="text-sm text-red-600 font-medium">Cash Outflows</div>
-                  <div className="text-2xl font-bold text-red-700 mt-1">
-                    {formatCurrency(expenses.reduce((sum, exp) => sum + exp.amount, 0))}
-                  </div>
-                  <div className="text-xs text-red-600 mt-1">{expenses.length} transactions</div>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="text-sm text-blue-600 font-medium">Net Cash Flow</div>
-                  <div className={`text-2xl font-bold mt-1 ${cashFlow >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                    {formatCurrency(cashFlow)}
-                  </div>
-                  <div className="text-xs text-blue-600 mt-1">
-                    Current: {formatCurrency(currentBalance)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Cash Inflows */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">💰 Cash Inflows (Revenue)</h3>
-                <div className="bg-white border rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {revenues.length > 0 ? revenues.map((rev) => (
-                        <tr key={rev.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{new Date(rev.date).toLocaleDateString()}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{rev.category}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{rev.description}</td>
-                          <td className="px-4 py-3 text-sm text-right text-green-600 font-medium">
-                            +{formatCurrency(rev.amount)}
-                          </td>
-                        </tr>
-                      )) : (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-gray-500">No revenue transactions</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Cash Outflows */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">💸 Cash Outflows (Expenses)</h3>
-                <div className="bg-white border rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {expenses.length > 0 ? expenses.map((exp) => (
-                        <tr key={exp.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{new Date(exp.date).toLocaleDateString()}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{exp.category}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{exp.description}</td>
-                          <td className="px-4 py-3 text-sm text-right text-red-600 font-medium">
-                            -{formatCurrency(exp.amount)}
-                          </td>
-                        </tr>
-                      )) : (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-gray-500">No expense transactions</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
@@ -2152,4 +2413,3 @@ The invoice has been saved in the system.
     </DashboardLayout>
   );
 }
-

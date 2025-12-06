@@ -21,6 +21,7 @@ import aiRoutes from './routes/ai.routes';
 import bankingRoutes from './routes/banking.routes';
 import emailRoutes from './routes/emailRoutes';
 import webhookRoutes from './routes/webhook.routes';
+import payrollRoutes from './routes/payroll.routes';
 
 dotenv.config();
 
@@ -79,6 +80,7 @@ app.use(`/api/${API_VERSION}/ai`, aiRoutes);
 app.use(`/api/${API_VERSION}/banking`, bankingRoutes);
 app.use(`/api/${API_VERSION}/email`, emailRoutes);
 app.use(`/api/${API_VERSION}/webhooks`, webhookRoutes);
+app.use(`/api/${API_VERSION}/payroll`, payrollRoutes);
 
 // Error handling
 app.use(errorHandler);

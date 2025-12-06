@@ -36,6 +36,13 @@ export const register = async (req: Request, res: Response, next: NextFunction):
 
     const { email, password, firstName, lastName, companyName } = req.body;
 
+    // Validate email domain (only @tekplugin.com allowed)
+    const allowedDomain = 'tekplugin.com';
+    const emailDomain = email.split('@')[1];
+    if (emailDomain !== allowedDomain) {
+      throw new AppError(`Only ${allowedDomain} email addresses are allowed to register`, 403);
+    }
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -48,18 +55,19 @@ export const register = async (req: Request, res: Response, next: NextFunction):
       isActive: true,
     });
 
-    // Create user as executive
+    // Create user with roles array (default to executive)
     const user = await User.create({
       email,
       password,
       firstName,
       lastName,
-      role: UserRole.EXECUTIVE,
+      roles: [UserRole.EXECUTIVE],
+      departments: [],
       companyId: company._id,
       isActive: true,
     });
 
-    const token = generateToken(user._id.toString(), user.email, user.role, user.companyId.toString());
+    const token = generateToken(user._id.toString(), user.email, user.roles[0], user.companyId.toString());
     const refreshToken = generateRefreshToken(user._id.toString());
 
     res.status(201).json({
@@ -69,7 +77,8 @@ export const register = async (req: Request, res: Response, next: NextFunction):
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role,
+        roles: user.roles,
+        departments: user.departments,
         companyId: user.companyId,
       },
       token,
@@ -89,6 +98,13 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
 
     const { email, password } = req.body;
 
+    // Validate email domain (only @tekplugin.com allowed)
+    const allowedDomain = 'tekplugin.com';
+    const emailDomain = email.split('@')[1];
+    if (emailDomain !== allowedDomain) {
+      throw new AppError(`Only ${allowedDomain} email addresses are allowed to login`, 403);
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
       throw new AppError('Invalid credentials', 401);
@@ -107,7 +123,7 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
     user.lastLogin = new Date();
     await user.save();
 
-    const token = generateToken(user._id.toString(), user.email, user.role, user.companyId.toString());
+    const token = generateToken(user._id.toString(), user.email, user.roles[0], user.companyId.toString());
     const refreshToken = generateRefreshToken(user._id.toString());
 
     res.json({
@@ -117,7 +133,8 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role,
+        roles: user.roles,
+        departments: user.departments,
         companyId: user.companyId,
       },
       token,
@@ -148,7 +165,7 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
       throw new AppError('User not found or inactive', 401);
     }
 
-    const newToken = generateToken(user._id.toString(), user.email, user.role, user.companyId.toString());
+    const newToken = generateToken(user._id.toString(), user.email, user.roles[0], user.companyId.toString());
     const newRefreshToken = generateRefreshToken(user._id.toString());
 
     res.json({
