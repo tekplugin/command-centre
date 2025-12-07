@@ -41,85 +41,97 @@ export default function FinancePage() {
   
   // Load assets from localStorage
   useEffect(() => {
-    const savedAssets = localStorage.getItem('company_assets');
-    if (savedAssets) {
-      try {
-        setAssets(JSON.parse(savedAssets));
-      } catch (e) {
-        console.error('Error loading assets:', e);
+    if (typeof window !== 'undefined') {
+      const savedAssets = localStorage.getItem('company_assets');
+      if (savedAssets) {
+        try {
+          setAssets(JSON.parse(savedAssets));
+        } catch (e) {
+          console.error('Error loading assets:', e);
+        }
       }
     }
   }, []);
 
   // Load payroll submissions from localStorage
   useEffect(() => {
-    const savedPayrolls = localStorage.getItem('payroll_submissions');
-    if (savedPayrolls) {
-      try {
-        setPayrollSubmissions(JSON.parse(savedPayrolls));
-      } catch (e) {
-        console.error('Error loading payrolls:', e);
+    if (typeof window !== 'undefined') {
+      const savedPayrolls = localStorage.getItem('payroll_submissions');
+      if (savedPayrolls) {
+        try {
+          setPayrollSubmissions(JSON.parse(savedPayrolls));
+        } catch (e) {
+          console.error('Error loading payrolls:', e);
+        }
       }
     }
   }, [showPayrollModal]);
 
   // Load procurement requests
   useEffect(() => {
-    const savedRequests = localStorage.getItem('procurement_requests');
-    if (savedRequests) {
-      try {
-        setProcurementRequests(JSON.parse(savedRequests));
-      } catch (e) {
-        console.error('Error loading procurement:', e);
+    if (typeof window !== 'undefined') {
+      const savedRequests = localStorage.getItem('procurement_requests');
+      if (savedRequests) {
+        try {
+          setProcurementRequests(JSON.parse(savedRequests));
+        } catch (e) {
+          console.error('Error loading procurement:', e);
+        }
       }
     }
   }, [showProcurementModal]);
 
   // Handle payroll approval
   const handleApprove = (id: string, comments: string) => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const updatedPayrolls = payrollSubmissions.map(p => 
-      p.id === id ? {
-        ...p,
-        status: 'approved' as const,
-        approvedBy: `${user.firstName} ${user.lastName}`,
-        approvedAt: new Date().toISOString()
-      } : p
-    );
-    setPayrollSubmissions(updatedPayrolls);
-    localStorage.setItem('payroll_submissions', JSON.stringify(updatedPayrolls));
-    alert('Payroll approved successfully!');
+    if (typeof window !== 'undefined') {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const updatedPayrolls = payrollSubmissions.map(p => 
+        p.id === id ? {
+          ...p,
+          status: 'approved' as const,
+          approvedBy: `${user.firstName} ${user.lastName}`,
+          approvedAt: new Date().toISOString()
+        } : p
+      );
+      setPayrollSubmissions(updatedPayrolls);
+      localStorage.setItem('payroll_submissions', JSON.stringify(updatedPayrolls));
+      alert('Payroll approved successfully!');
+    }
   };
 
   // Handle payroll rejection
   const handleReject = (id: string, reason: string) => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const updatedPayrolls = payrollSubmissions.map(p => 
-      p.id === id ? {
-        ...p,
-        status: 'rejected' as const,
-        rejectedBy: `${user.firstName} ${user.lastName}`,
-        rejectedAt: new Date().toISOString(),
-        rejectionReason: reason
-      } : p
-    );
-    setPayrollSubmissions(updatedPayrolls);
-    localStorage.setItem('payroll_submissions', JSON.stringify(updatedPayrolls));
-    alert('Payroll rejected');
+    if (typeof window !== 'undefined') {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const updatedPayrolls = payrollSubmissions.map(p => 
+        p.id === id ? {
+          ...p,
+          status: 'rejected' as const,
+          rejectedBy: `${user.firstName} ${user.lastName}`,
+          rejectedAt: new Date().toISOString(),
+          rejectionReason: reason
+        } : p
+      );
+      setPayrollSubmissions(updatedPayrolls);
+      localStorage.setItem('payroll_submissions', JSON.stringify(updatedPayrolls));
+      alert('Payroll rejected');
+    }
   };
 
   // Handle mark as paid
   const handleMarkPaid = (id: string) => {
-    const updatedPayrolls = payrollSubmissions.map(p => 
-      p.id === id ? {
-        ...p,
-        status: 'paid' as const,
-        paidAt: new Date().toISOString()
-      } : p
-    );
-    setPayrollSubmissions(updatedPayrolls);
-    localStorage.setItem('payroll_submissions', JSON.stringify(updatedPayrolls));
-    alert('Payroll marked as paid!');
+    if (typeof window !== 'undefined') {
+      const updatedPayrolls = payrollSubmissions.map(p => 
+        p.id === id ? {
+          ...p,
+          status: 'paid' as const,
+          paidAt: new Date().toISOString()
+        } : p
+      );
+      setPayrollSubmissions(updatedPayrolls);
+      localStorage.setItem('payroll_submissions', JSON.stringify(updatedPayrolls));
+      alert('Payroll marked as paid!');
+    }
   };
   
   // HR Employee Data (shared across the app)
@@ -216,15 +228,19 @@ export default function FinancePage() {
 
   // Load currency preference from localStorage
   useEffect(() => {
-    const savedCurrency = localStorage.getItem('app_currency');
-    if (savedCurrency === 'USD' || savedCurrency === 'NGN') {
-      setCurrency(savedCurrency);
+    if (typeof window !== 'undefined') {
+      const savedCurrency = localStorage.getItem('app_currency');
+      if (savedCurrency === 'USD' || savedCurrency === 'NGN') {
+        setCurrency(savedCurrency);
+      }
     }
   }, []);
 
   // Save currency preference to localStorage
   useEffect(() => {
-    localStorage.setItem('app_currency', currency);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('app_currency', currency);
+    }
   }, [currency]);
 
   // Currency conversion function
@@ -251,68 +267,70 @@ export default function FinancePage() {
 
   // Load data from localStorage on mount
   useEffect(() => {
-    const savedInvoices = localStorage.getItem('cfo_invoices');
-    const savedAccountsReceivable = localStorage.getItem('cfo_accounts_receivable');
-    const savedExpenses = localStorage.getItem('cfo_expenses');
-    const savedRevenues = localStorage.getItem('cfo_revenues');
-    
-    if (savedInvoices) {
-      try {
-        setInvoices(JSON.parse(savedInvoices));
-      } catch (e) {
-        console.error('Error loading invoices:', e);
+    if (typeof window !== 'undefined') {
+      const savedInvoices = localStorage.getItem('cfo_invoices');
+      const savedAccountsReceivable = localStorage.getItem('cfo_accounts_receivable');
+      const savedExpenses = localStorage.getItem('cfo_expenses');
+      const savedRevenues = localStorage.getItem('cfo_revenues');
+      
+      if (savedInvoices) {
+        try {
+          setInvoices(JSON.parse(savedInvoices));
+        } catch (e) {
+          console.error('Error loading invoices:', e);
+        }
       }
-    }
-    
-    if (savedAccountsReceivable) {
-      try {
-        setAccountsReceivable(JSON.parse(savedAccountsReceivable));
-      } catch (e) {
-        console.error('Error loading accounts receivable:', e);
+      
+      if (savedAccountsReceivable) {
+        try {
+          setAccountsReceivable(JSON.parse(savedAccountsReceivable));
+        } catch (e) {
+          console.error('Error loading accounts receivable:', e);
+        }
       }
-    }
-    
-    if (savedExpenses) {
-      try {
-        setExpenses(JSON.parse(savedExpenses));
-      } catch (e) {
-        console.error('Error loading expenses:', e);
+      
+      if (savedExpenses) {
+        try {
+          setExpenses(JSON.parse(savedExpenses));
+        } catch (e) {
+          console.error('Error loading expenses:', e);
+        }
       }
-    }
-    
-    if (savedRevenues) {
-      try {
-        setRevenues(JSON.parse(savedRevenues));
-      } catch (e) {
-        console.error('Error loading revenues:', e);
+      
+      if (savedRevenues) {
+        try {
+          setRevenues(JSON.parse(savedRevenues));
+        } catch (e) {
+          console.error('Error loading revenues:', e);
+        }
       }
     }
   }, []);
 
   // Save invoices to localStorage whenever they change
   useEffect(() => {
-    if (invoices.length > 0) {
+    if (typeof window !== 'undefined' && invoices.length > 0) {
       localStorage.setItem('cfo_invoices', JSON.stringify(invoices));
     }
   }, [invoices]);
 
   // Save accounts receivable to localStorage whenever they change
   useEffect(() => {
-    if (accountsReceivable.length > 0) {
+    if (typeof window !== 'undefined' && accountsReceivable.length > 0) {
       localStorage.setItem('cfo_accounts_receivable', JSON.stringify(accountsReceivable));
     }
   }, [accountsReceivable]);
 
   // Save expenses to localStorage whenever they change
   useEffect(() => {
-    if (expenses.length > 0) {
+    if (typeof window !== 'undefined' && expenses.length > 0) {
       localStorage.setItem('cfo_expenses', JSON.stringify(expenses));
     }
   }, [expenses]);
 
   // Save revenues to localStorage whenever they change
   useEffect(() => {
-    if (revenues.length > 0) {
+    if (typeof window !== 'undefined' && revenues.length > 0) {
       localStorage.setItem('cfo_revenues', JSON.stringify(revenues));
     }
   }, [revenues]);
