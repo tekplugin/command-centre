@@ -24,78 +24,80 @@ interface Email {
 }
 
 export default function InboxPage() {
+    useEffect(() => {
+      fetchEmails();
+      // eslint-disable-next-line
+    }, [filter]);
+
+    const fetchEmails = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        let url = `${apiUrl}/email/inbox`;
+        if (filter === 'unread') {
+          url += '?isRead=false';
+        } else if (filter === 'archived') {
+          url += '?isArchived=true';
+        }
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          setEmails(result.data || []);
+        } else {
+          console.error('Failed to fetch emails');
+        }
+      } catch (error) {
+        console.error('Error fetching emails:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unread' | 'archived'>('all');
   const [showEmailModal, setShowEmailModal] = useState(false);
 
-  useEffect(() => {
-    fetchEmails();
-  }, [filter]);
 
-  const fetchEmails = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      
-      let url = 'http://localhost:5000/api/v1/email/inbox';
-      if (filter === 'unread') {
-        url += '?isRead=false';
-      } else if (filter === 'archived') {
-        url += '?isArchived=true';
-      }
-
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setEmails(result.data || []);
-      } else {
-        console.error('Failed to fetch emails');
-      }
-    } catch (error) {
-      console.error('Error fetching emails:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const viewEmail = async (email: Email) => {
+        // Mark as read
+        if (!email.isRead) {
+          try {
+            const token = localStorage.getItem('token');
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+            await fetch(`${apiUrl}/email/inbox/${email._id}/read`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ isRead: true }),
+            });
+            // Update local state
+            setEmails(emails.map(e => 
+              e._id === email._id ? { ...e, isRead: true } : e
+            ));
+          } catch (error) {
+            console.error('Error marking email as read:', error);
+          }
+        }
     setSelectedEmail(email);
     setShowEmailModal(true);
 
-    // Mark as read
-    if (!email.isRead) {
-      try {
-        const token = localStorage.getItem('token');
-        await fetch(`http://localhost:5000/api/v1/email/inbox/${email._id}/read`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ isRead: true }),
-        });
 
-        // Update local state
-        setEmails(emails.map(e => 
-          e._id === email._id ? { ...e, isRead: true } : e
-        ));
-      } catch (error) {
-        console.error('Error marking email as read:', error);
-      }
-    }
   };
 
   const toggleArchive = async (emailId: string, isArchived: boolean) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:5000/api/v1/email/inbox/${emailId}/archive`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      await fetch(`${apiUrl}/email/inbox/${emailId}/archive`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -103,12 +105,12 @@ export default function InboxPage() {
         },
         body: JSON.stringify({ isArchived: !isArchived }),
       });
-
       fetchEmails();
       setShowEmailModal(false);
     } catch (error) {
       console.error('Error archiving email:', error);
     }
+
   };
 
   const formatDate = (dateString: string) => {
