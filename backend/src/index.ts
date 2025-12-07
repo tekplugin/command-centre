@@ -27,6 +27,8 @@ import passwordResetRoutes from './routes/passwordReset.routes';
 dotenv.config();
 
 const app: Application = express();
+// Enable trust proxy for Nginx X-Forwarded-For support
+app.set('trust proxy', 1);
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
