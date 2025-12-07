@@ -317,9 +317,12 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="text-center">
-            <Link href="/register" className="font-medium text-primary-600 hover:text-primary-500">
-              Don't have an account? Contact your administrator
+          <div className="flex items-center justify-between">
+            <Link href="/forgot-password" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+              Forgot your password?
+            </Link>
+            <Link href="/register" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+              Contact administrator
             </Link>
           </div>
         </form>

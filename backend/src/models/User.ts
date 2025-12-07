@@ -33,6 +33,8 @@ export interface IUser extends Document {
   avatarUrl?: string;
   isActive: boolean;
   lastLogin?: Date;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
   hasRole(role: UserRole): boolean;
   hasDepartmentAccess(department: Department): boolean;
@@ -88,6 +90,12 @@ const userSchema = new Schema<IUser>(
       default: true,
     },
     lastLogin: {
+      type: Date,
+    },
+    resetPasswordToken: {
+      type: String,
+    },
+    resetPasswordExpires: {
       type: Date,
     },
   },

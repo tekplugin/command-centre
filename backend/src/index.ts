@@ -22,6 +22,7 @@ import bankingRoutes from './routes/banking.routes';
 import emailRoutes from './routes/emailRoutes';
 import webhookRoutes from './routes/webhook.routes';
 import payrollRoutes from './routes/payroll.routes';
+import passwordResetRoutes from './routes/passwordReset.routes';
 
 dotenv.config();
 
@@ -70,6 +71,7 @@ app.get('/health', (_req, res) => {
 // API Routes
 const API_VERSION = process.env.API_VERSION || 'v1';
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
+app.use(`/api/${API_VERSION}/password`, passwordResetRoutes);
 app.use(`/api/${API_VERSION}/users`, userRoutes);
 app.use(`/api/${API_VERSION}/financial`, financialRoutes);
 app.use(`/api/${API_VERSION}/hr`, hrRoutes);

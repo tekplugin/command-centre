@@ -34,9 +34,9 @@ const resetPassword = async () => {
     if (!user) {
       console.error(`User not found: ${email}`);
       console.log('\nAvailable users:');
-      const users = await User.find({}, 'email firstName lastName role');
+      const users = await User.find({}, 'email firstName lastName roles');
       users.forEach(u => {
-        console.log(`  - ${u.email} (${u.firstName} ${u.lastName}) - Role: ${u.role}`);
+        console.log(`  - ${u.email} (${u.firstName} ${u.lastName}) - Roles: ${u.roles.join(', ')}`);
       });
       process.exit(1);
     }
@@ -49,7 +49,7 @@ const resetPassword = async () => {
     console.log('\n✅ Password updated successfully!');
     console.log(`Email: ${user.email}`);
     console.log(`Name: ${user.firstName} ${user.lastName}`);
-    console.log(`Role: ${user.role}`);
+    console.log(`Roles: ${user.roles.join(', ')}`);
     console.log('\nYou can now login with the new password.');
 
     await mongoose.connection.close();
