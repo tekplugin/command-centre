@@ -735,7 +735,6 @@ The invoice has been saved in the system.
         setSelectedInvoice(null);
         setEmailData({ to: '', subject: '', message: '' });
       }
-      }
     } catch (error: any) {
       console.error('Error sending invoice email:', error);
       alert(`Error sending email: ${error.message}`);
