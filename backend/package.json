@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "jest",
-    "seed:sales": "ts-node src/scripts/seedSalesLeads.ts"
+    "seed:sales": "ts-node src/scripts/seedSalesLeads.ts",
+    "reset-password": "ts-node src/scripts/resetPassword.ts"
   },
   "keywords": [],
   "author": "",
