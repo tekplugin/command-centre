@@ -28,7 +28,7 @@ export default function ResetPasswordPage() {
 
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://13.219.183.238:5000'}/api/v1/password/verify-token/${token}`
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://13.219.183.238:5000/api/v1'}/password/verify-token/${token}`
         );
         const data = await response.json();
 
@@ -66,7 +66,7 @@ export default function ResetPasswordPage() {
 
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://13.219.183.238:5000'}/api/v1/password/reset-password`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://13.219.183.238:5000/api/v1'}/password/reset-password`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

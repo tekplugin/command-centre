@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
     setMessage('');
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://13.219.183.238:5000'}/api/v1/password/forgot-password`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://13.219.183.238:5000/api/v1'}/password/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
