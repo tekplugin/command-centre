@@ -321,9 +321,9 @@ export default function LoginPage() {
             <Link href="/forgot-password" className="text-sm font-medium text-primary-600 hover:text-primary-500">
               Forgot your password?
             </Link>
-            <Link href="/register" className="text-sm font-medium text-primary-600 hover:text-primary-500">
-              Contact administrator
-            </Link>
+            <span className="text-sm text-gray-500">
+              Need an account? Contact administrator
+            </span>
           </div>
         </form>
       </div>
