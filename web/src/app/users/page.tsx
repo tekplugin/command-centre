@@ -126,7 +126,8 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/v1/users', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const response = await fetch(`${apiUrl}/users`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -146,7 +147,8 @@ export default function UsersPage() {
     try {
       console.log('Creating user with data:', formData);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/v1/users', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const response = await fetch(`${apiUrl}/users`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -175,7 +177,8 @@ export default function UsersPage() {
     try {
       console.log('Updating user with data:', formData);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/v1/users/${editingUser._id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const response = await fetch(`${apiUrl}/users/${editingUser._id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

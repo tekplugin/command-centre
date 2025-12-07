@@ -675,7 +675,8 @@ export default function FinancePage() {
 
       // Try to send via backend, with fallback
       try {
-        const response = await fetch('http://localhost:5000/api/v1/email/send-invoice', {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        const response = await fetch(`${apiUrl}/email/send-invoice`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
