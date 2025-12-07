@@ -36,7 +36,6 @@ export const handleIncomingEmail = async (req: Request, res: Response): Promise<
     // In production, enable signature verification
     
     const webhookData = req.body;
-    
     // Check if this is a domain event (not an email)
     if (webhookData.type && (webhookData.type === 'domain.created' || webhookData.type === 'domain.updated')) {
       logger.info('Received domain event, ignoring', {
@@ -44,7 +43,6 @@ export const handleIncomingEmail = async (req: Request, res: Response): Promise<
         domain: webhookData.data?.name,
         status: webhookData.data?.status,
       });
-      
       // Return success but don't process as email
       res.status(200).json({ 
         success: true, 
@@ -53,42 +51,42 @@ export const handleIncomingEmail = async (req: Request, res: Response): Promise<
       });
       return;
     }
-    
-    // Check if this is an actual email event
-    if (!webhookData.from || !webhookData.subject) {
+
+    // Extract email fields from webhookData.data (Resend format)
+    const email = webhookData.data || {};
+    if (!email.from || !email.subject) {
       logger.warn('Webhook received without required email fields', {
-        hasFrom: !!webhookData.from,
-        hasSubject: !!webhookData.subject,
+        hasFrom: !!email.from,
+        hasSubject: !!email.subject,
         type: webhookData.type,
         data: JSON.stringify(webhookData).substring(0, 200),
       });
-      
       res.status(400).json({ 
         success: false, 
         error: 'Invalid email data - missing required fields' 
       });
       return;
     }
-    
+
     logger.info('Received incoming email webhook', {
-      from: webhookData.from,
-      to: webhookData.to,
-      subject: webhookData.subject,
+      from: email.from,
+      to: email.to,
+      subject: email.subject,
     });
 
     // Extract email data from webhook
     const emailData = {
-      messageId: webhookData.message_id || webhookData.id,
-      from: webhookData.from,
-      to: webhookData.to,
-      subject: webhookData.subject || '(No Subject)',
-      textBody: webhookData.text || webhookData.plain_text || '',
-      htmlBody: webhookData.html || webhookData.html_body || '',
-      receivedAt: new Date(webhookData.created_at || Date.now()),
-      headers: webhookData.headers || {},
-      attachments: webhookData.attachments || [],
-      inReplyTo: webhookData.in_reply_to || null,
-      references: webhookData.references || null,
+      messageId: email.message_id || email.id,
+      from: email.from,
+      to: email.to,
+      subject: email.subject || '(No Subject)',
+      textBody: email.text || email.plain_text || '',
+      htmlBody: email.html || email.html_body || '',
+      receivedAt: new Date(email.created_at || Date.now()),
+      headers: email.headers || {},
+      attachments: email.attachments || [],
+      inReplyTo: email.in_reply_to || null,
+      references: email.references || null,
     };
 
     // Save to database
