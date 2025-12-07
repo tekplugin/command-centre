@@ -41,7 +41,7 @@ const seedUser = async () => {
     console.log('User created successfully:');
     console.log('Email:', user.email);
     console.log('Name:', `${user.firstName} ${user.lastName}`);
-    console.log('Role:', user.role);
+    console.log('Role:', user.roles);
 
     await mongoose.connection.close();
     console.log('Done!');

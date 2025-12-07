@@ -1,19 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { Permission, hasPermission, hasAnyPermission, hasAllPermissions } from '../types/permissions';
 
-// Extend Express Request type to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        email: string;
-        role: string;
-        companyId: string;
-      };
-    }
-  }
-}
+// User type is already defined in auth.ts middleware
+// No need to redeclare it here
 
 /**
  * Middleware to check if user has a specific permission
@@ -21,15 +10,17 @@ declare global {
 export const requirePermission = (permission: Permission) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return res.status(401).json({ message: 'Authentication required' });
+      res.status(401).json({ message: 'Authentication required' });
+      return;
     }
 
-    if (!hasPermission(req.user.role, permission)) {
-      return res.status(403).json({ 
+    if (!hasPermission([req.user.role], permission)) {
+      res.status(403).json({ 
         message: 'Insufficient permissions',
         required: permission,
         userRole: req.user.role
       });
+      return;
     }
 
     next();
@@ -42,15 +33,17 @@ export const requirePermission = (permission: Permission) => {
 export const requireAnyPermission = (permissions: Permission[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return res.status(401).json({ message: 'Authentication required' });
+      res.status(401).json({ message: 'Authentication required' });
+      return;
     }
 
-    if (!hasAnyPermission(req.user.role, permissions)) {
-      return res.status(403).json({ 
+    if (!hasAnyPermission([req.user.role], permissions)) {
+      res.status(403).json({ 
         message: 'Insufficient permissions',
         required: 'any of: ' + permissions.join(', '),
         userRole: req.user.role
       });
+      return;
     }
 
     next();
@@ -63,15 +56,17 @@ export const requireAnyPermission = (permissions: Permission[]) => {
 export const requireAllPermissions = (permissions: Permission[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return res.status(401).json({ message: 'Authentication required' });
+      res.status(401).json({ message: 'Authentication required' });
+      return;
     }
 
-    if (!hasAllPermissions(req.user.role, permissions)) {
-      return res.status(403).json({ 
+    if (!hasAllPermissions([req.user.role], permissions)) {
+      res.status(403).json({ 
         message: 'Insufficient permissions',
         required: 'all of: ' + permissions.join(', '),
         userRole: req.user.role
       });
+      return;
     }
 
     next();
@@ -83,14 +78,16 @@ export const requireAllPermissions = (permissions: Permission[]) => {
  */
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) {
-    return res.status(401).json({ message: 'Authentication required' });
+    res.status(401).json({ message: 'Authentication required' });
+    return;
   }
 
   if (req.user.role !== 'admin') {
-    return res.status(403).json({ 
+    res.status(403).json({ 
       message: 'Admin access required',
       userRole: req.user.role
     });
+    return;
   }
 
   next();
@@ -101,14 +98,16 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction) =>
  */
 export const requireExecutiveOrAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) {
-    return res.status(401).json({ message: 'Authentication required' });
+    res.status(401).json({ message: 'Authentication required' });
+    return;
   }
 
   if (req.user.role !== 'admin' && req.user.role !== 'executive') {
-    return res.status(403).json({ 
+    res.status(403).json({ 
       message: 'Executive or Admin access required',
       userRole: req.user.role
     });
+    return;
   }
 
   next();
