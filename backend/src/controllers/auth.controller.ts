@@ -98,7 +98,6 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
 
 
     const email = req.body.email?.toLowerCase();
-    const _password = req.body.password;
 
     // Validate email domain (only @tekplugin.com allowed)
     const allowedDomain = 'tekplugin.com';
