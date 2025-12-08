@@ -1,3 +1,4 @@
+import emailService from '../services/emailService';
 import { Router, Request, Response } from 'express';
 import * as emailController from '../controllers/email.controller';
 import { authenticate } from '../middleware/auth';

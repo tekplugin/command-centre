@@ -251,52 +251,53 @@ class EmailService {
     });
   }
 
-  async scheduleEmail(options: EmailOptions & { scheduledAt: Date }): Promise<any> {
+  async scheduleEmail(_options: EmailOptions & { scheduledAt: Date }): Promise<any> {
     // Logic to queue email for future send
   }
-  async starEmail(emailId: string, starred: boolean): Promise<any> {
+  async starEmail(_emailId: string, _starred: boolean): Promise<any> {
     // Logic to star/unstar email
   }
-  async markSpam(emailId: string, spam: boolean): Promise<any> {
+  async markSpam(_emailId: string, _spam: boolean): Promise<any> {
     // Logic to mark email as spam
   }
-  async deleteEmail(emailId: string): Promise<any> {
+  async deleteEmail(_emailId: string): Promise<any> {
     // Logic to delete email
   }
-  async restoreEmail(emailId: string): Promise<any> {
+  async restoreEmail(_emailId: string): Promise<any> {
     // Logic to restore deleted email
   }
-  async moveToFolder(emailId: string, folder: string): Promise<any> {
+  async moveToFolder(_emailId: string, _folder: string): Promise<any> {
     // Logic to move email to folder
   }
-  async addLabel(emailId: string, label: string): Promise<any> {
+  async addLabel(_emailId: string, _label: string): Promise<any> {
     // Logic to add label
   }
-  async removeLabel(emailId: string, label: string): Promise<any> {
+  async removeLabel(_emailId: string, _label: string): Promise<any> {
     // Logic to remove label
   }
-  async bulkUpdate(emailIds: string[], updates: any): Promise<any> {
+  async bulkUpdate(_emailIds: string[], _updates: any): Promise<any> {
     // Logic for bulk actions
   }
-  async saveDraft(draft: any): Promise<any> {
+  async saveDraft(_draft: any): Promise<any> {
     // Logic to save draft
   }
-  async updateDraft(draftId: string, updates: any): Promise<any> {
+  async updateDraft(_draftId: string, _updates: any): Promise<any> {
     // Logic to update draft
   }
-  async deleteDraft(draftId: string): Promise<any> {
+  async deleteDraft(_draftId: string): Promise<any> {
     // Logic to delete draft
   }
-  async getDrafts(userId: string): Promise<any> {
+  async getDrafts(_userId: string): Promise<any> {
     // Logic to get drafts for user
   }
-  async getSignature(userId: string): Promise<any> {
+  async getSignature(_userId: string): Promise<any> {
     // Logic to get user signature
   }
-  async updateSignature(userId: string, signature: string): Promise<any> {
+  async updateSignature(_userId: string, _signature: string): Promise<any> {
     // Logic to update user signature
   }
-  async getAttachmentUrl(emailId: string, attId: string): Promise<string> {
+  async getAttachmentUrl(_emailId: string, _attId: string): Promise<string> {
+    return '';
     // Logic to get attachment download URL
   }
 }
