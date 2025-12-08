@@ -108,6 +108,7 @@ export default function MailPageClient() {
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache',
         },
       });
       if (response.ok) {
