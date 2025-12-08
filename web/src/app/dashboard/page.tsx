@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
+import OrgOverview from './OrgOverview';
 import { FaProjectDiagram, FaTicketAlt, FaHandshake } from 'react-icons/fa';
 
 // Define types
@@ -63,6 +64,7 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout>
+      <OrgOverview />
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-6">Welcome, {user.name}!</h1>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

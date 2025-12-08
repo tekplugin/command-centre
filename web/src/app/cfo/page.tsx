@@ -111,26 +111,33 @@ export default function FinancePage() {
   const [showEmailModal, setShowEmailModal] = useState(false);
 
   
-  // Load assets from localStorage
+
+  // Load assets and payroll submissions from backend API
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedAssets = localStorage.getItem('company_assets');
-      if (savedAssets) {
-        try {
-          setAssets(JSON.parse(savedAssets));
-        } catch (e) {
-          console.error('Error loading assets:', e);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    async function fetchFinanceData() {
+      try {
+        const assetsRes = await fetch(`${apiUrl}/finance/assets`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (assetsRes.ok) {
+          setAssets(await assetsRes.json());
         }
+        const payrollRes = await fetch(`${apiUrl}/finance/payroll-submissions`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (payrollRes.ok) {
+          setPayrollSubmissions(await payrollRes.json());
+        }
+      } catch (e) {
+        console.error('Error loading finance data:', e);
       }
     }
-  }, []);
-
-  // Load payroll submissions from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedPayrolls = localStorage.getItem('payroll_submissions');
-      // ...existing code...
-    }
+    fetchFinanceData();
   }, []);
 
   // Poll exchange rate every hour

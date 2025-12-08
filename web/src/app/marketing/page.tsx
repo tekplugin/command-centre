@@ -20,26 +20,33 @@ export default function MarketingPage() {
     targetAudience: '',
   });
 
-  // Load campaigns from localStorage
-  useEffect(() => {
-    const savedCampaigns = localStorage.getItem('marketing_campaigns');
-    if (savedCampaigns) {
-      try {
-        setCampaigns(JSON.parse(savedCampaigns));
-      } catch (e) {
-        console.error('Error loading campaigns:', e);
-      }
-    }
 
-    // Load leads
-    const savedLeads = localStorage.getItem('marketing_leads');
-    if (savedLeads) {
+  // Load campaigns and leads from backend API
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    async function fetchMarketingData() {
       try {
-        setLeads(JSON.parse(savedLeads));
+        const campaignsRes = await fetch(`${apiUrl}/marketing/campaigns`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (campaignsRes.ok) {
+          setCampaigns(await campaignsRes.json());
+        }
+        const leadsRes = await fetch(`${apiUrl}/marketing/leads`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (leadsRes.ok) {
+          setLeads(await leadsRes.json());
+        }
       } catch (e) {
-        console.error('Error loading leads:', e);
+        console.error('Error loading marketing data:', e);
       }
     }
+    fetchMarketingData();
   }, []);
 
   // Calculate dynamic stats from actual data

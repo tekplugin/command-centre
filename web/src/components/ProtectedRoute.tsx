@@ -15,32 +15,27 @@ export default function ProtectedRoute({ children, requiredDepartment }: Protect
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const checkAccess = () => {
-      const userStr = localStorage.getItem('user');
-      
-      if (!userStr) {
-        router.push('/login');
-        return;
-      }
-
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    const checkAccess = async () => {
       try {
-        const userData = JSON.parse(userStr);
+        const res = await fetch(`${apiUrl}/users/me`, { credentials: 'include' });
+        if (!res.ok) {
+          router.push('/login');
+          return;
+        }
+        const userData = await res.json();
         const department = requiredDepartment || getDepartmentForRoute(pathname);
         const access = checkDepartmentAccess(department, userData);
-        
         if (!access) {
-          // Redirect to dashboard if no access
           router.push('/dashboard');
           return;
         }
-        
         setHasAccess(true);
       } catch (error) {
         console.error('Error checking access:', error);
         router.push('/login');
       }
     };
-
     checkAccess();
   }, [pathname, requiredDepartment, router]);
 

@@ -6,8 +6,37 @@ import DashboardLayout from '@/components/DashboardLayout';
 export default function ITPage() {
   const [showNewTicket, setShowNewTicket] = useState(false);
   const [showAssetModal, setShowAssetModal] = useState(false);
+
   const [tickets, setTickets] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
+
+  // Load IT tickets and assets from backend API
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    async function fetchITData() {
+      try {
+        const ticketsRes = await fetch(`${apiUrl}/it/tickets`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (ticketsRes.ok) {
+          setTickets(await ticketsRes.json());
+        }
+        const assetsRes = await fetch(`${apiUrl}/it/assets`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (assetsRes.ok) {
+          setAssets(await assetsRes.json());
+        }
+      } catch (e) {
+        console.error('Error loading IT data:', e);
+      }
+    }
+    fetchITData();
+  }, []);
 
   const stats = {
     totalTickets: tickets.length,

@@ -9,15 +9,25 @@ export default function CustomerServicePage() {
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [tickets, setTickets] = useState<any[]>([]);
 
+
+  // Load customer service tickets from backend API
   useEffect(() => {
-    const savedTickets = localStorage.getItem('support_tickets');
-    if (savedTickets) {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    async function fetchCustomerServiceTickets() {
       try {
-        setTickets(JSON.parse(savedTickets));
+        const res = await fetch(`${apiUrl}/customer-service/tickets`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (res.ok) {
+          setTickets(await res.json());
+        }
       } catch (e) {
-        console.error('Error loading tickets:', e);
+        console.error('Error loading customer service tickets:', e);
       }
     }
+    fetchCustomerServiceTickets();
   }, []);
 
   const stats = {

@@ -76,20 +76,26 @@ export default function LegalPage() {
     return [];
   };
 
-  // Load documents on mount
-  useEffect(() => {
-    const savedDocs = loadDocumentsFromStorage();
-    if (savedDocs.length > 0) {
-      setDocuments(savedDocs);
-    }
-  }, []);
 
-  // Save documents (metadata only) when changed
+  // Load documents from backend API
   useEffect(() => {
-    if (documents.length > 0) {
-      saveDocumentsToStorage(documents);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    async function fetchLegalDocuments() {
+      try {
+        const res = await fetch(`${apiUrl}/legal/documents`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (res.ok) {
+          setDocuments(await res.json());
+        }
+      } catch (e) {
+        console.error('Error loading legal documents:', e);
+      }
     }
-  }, [documents]);
+    fetchLegalDocuments();
+  }, []);
 
   // Check document expiry status
   const getDocumentStatus = (expiryDate?: string): 'active' | 'expired' | 'expiring-soon' => {

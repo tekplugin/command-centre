@@ -23,54 +23,72 @@ export default function HRPage() {
   const [payrollSubmissions, setPayrollSubmissions] = useState<PayrollSubmission[]>([]);
   const [staffDocuments, setStaffDocuments] = useState<any[]>([]);
   
-  // Load payroll submissions
+  // Load payroll submissions from backend
   useEffect(() => {
-    const savedPayrolls = localStorage.getItem('payroll_submissions');
-    if (savedPayrolls) {
+    async function fetchPayroll() {
       try {
-        setPayrollSubmissions(JSON.parse(savedPayrolls));
+        const token = localStorage.getItem('token');
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+        const res = await fetch(`${apiUrl}/hr/payroll`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const result = await res.json();
+          setPayrollSubmissions(result.data || []);
+        }
       } catch (e) {
         console.error('Error loading payrolls:', e);
       }
     }
+    fetchPayroll();
   }, [showPayrollModal]);
 
   // Handle payroll updates
-  const handlePayrollUpdate = (payrolls: PayrollSubmission[]) => {
+  const handlePayrollUpdate = async (payrolls: PayrollSubmission[]) => {
     setPayrollSubmissions(payrolls);
-    localStorage.setItem('payroll_submissions', JSON.stringify(payrolls));
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+      await fetch(`${apiUrl}/hr/payroll`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payrolls),
+      });
+    } catch (e) {
+      console.error('Error saving payrolls:', e);
+    }
   };
   
-  // Load HR staff documents
+  // Load HR staff documents, employees, and leave requests from backend
   useEffect(() => {
-    const savedDocuments = localStorage.getItem('hr_staff_documents');
-    if (savedDocuments) {
+    async function fetchHRData() {
       try {
-        setStaffDocuments(JSON.parse(savedDocuments));
+        const token = localStorage.getItem('token');
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+        // Employees
+        const empRes = await fetch(`${apiUrl}/hr/employees`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+        if (empRes.ok) {
+          const empData = await empRes.json();
+          setEmployees(empData.data || []);
+        }
+        // Leave requests
+        const leaveRes = await fetch(`${apiUrl}/hr/attendance`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+        if (leaveRes.ok) {
+          const leaveData = await leaveRes.json();
+          setLeaveRequests(leaveData.data || []);
+        }
+        // Staff documents (if endpoint exists)
+        // const docRes = await fetch(`${apiUrl}/hr/documents`, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} });
+        // if (docRes.ok) { const docData = await docRes.json(); setStaffDocuments(docData.data || []); }
       } catch (e) {
-        console.error('Error loading staff documents:', e);
+        console.error('Error loading HR data:', e);
       }
     }
-
-    // Load employees from localStorage
-    const savedEmployees = localStorage.getItem('employees');
-    if (savedEmployees) {
-      try {
-        setEmployees(JSON.parse(savedEmployees));
-      } catch (e) {
-        console.error('Error loading employees:', e);
-      }
-    }
-
-    // Load leave requests from localStorage
-    const savedLeaves = localStorage.getItem('leave_requests');
-    if (savedLeaves) {
-      try {
-        setLeaveRequests(JSON.parse(savedLeaves));
-      } catch (e) {
-        console.error('Error loading leave requests:', e);
-      }
-    }
+    fetchHRData();
   }, [showAddModal]); // Reload when modal opens
   
   const [formData, setFormData] = useState({

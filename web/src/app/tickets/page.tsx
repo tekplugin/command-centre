@@ -33,114 +33,33 @@ export default function TicketsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load tickets from localStorage
+  // Load tickets from backend
   useEffect(() => {
-    try {
-      const savedTickets = localStorage.getItem('company_tickets');
-      if (savedTickets) setTickets(JSON.parse(savedTickets));
-      setLoading(false);
-    } catch (e: any) {
-      setError('Failed to load tickets.');
-      setLoading(false);
+    async function fetchTickets() {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+        const response = await fetch(`${apiUrl}/support/tickets`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+        if (response.ok) {
+          const result = await response.json();
+          setTickets(result.data || []);
+        } else {
+          setError('Failed to fetch tickets.');
+        }
+      } catch (e: any) {
+        setError('Failed to load tickets.');
+      } finally {
+        setLoading(false);
+      }
     }
+    fetchTickets();
   }, []);
 
-  const sampleTickets: Ticket[] = [
-    {
-      id: '1',
-      ticketNumber: 'TKT-2024-1145',
-      bank: 'GTBank',
-      location: 'Victoria Island Mall, Lagos',
-      terminalId: 'GTB-VI-0234',
-      fault: 'Card reader not responding',
-      priority: 'critical',
-      status: 'en-route',
-      assignedTo: 'Eng. Chidi Okonkwo',
-      reportedAt: '2024-11-29 08:30',
-    },
-    {
-      id: '2',
-      ticketNumber: 'TKT-2024-1144',
-      bank: 'Access Bank',
-      location: 'Ikeja City Mall, Lagos',
-      terminalId: 'ACC-IK-0567',
-      fault: 'Cash dispenser jam',
-      priority: 'high',
-      status: 'on-site',
-      assignedTo: 'Eng. Amina Yusuf',
-      reportedAt: '2024-11-29 07:15',
-    },
-    {
-      id: '3',
-      ticketNumber: 'TKT-2024-1143',
-      bank: 'Zenith Bank',
-      location: 'Lekki Phase 1, Lagos',
-      terminalId: 'ZEN-LK-0892',
-      fault: 'Receipt printer out of paper',
-      priority: 'medium',
-      status: 'assigned',
-      assignedTo: 'Eng. Oluwaseun Adeyemi',
-      reportedAt: '2024-11-29 06:45',
-    },
-    {
-      id: '4',
-      ticketNumber: 'TKT-2024-1142',
-      bank: 'First Bank',
-      location: 'Surulere Branch, Lagos',
-      terminalId: 'FBN-SR-0445',
-      fault: 'Screen display issue',
-      priority: 'high',
-      status: 'unassigned',
-      reportedAt: '2024-11-29 05:30',
-    },
-    {
-      id: '5',
-      ticketNumber: 'TKT-2024-1141',
-      bank: 'UBA',
-      location: 'Maryland Mall, Lagos',
-      terminalId: 'UBA-MD-0778',
-      fault: 'Network connectivity issue',
-      priority: 'critical',
-      status: 'unassigned',
-      reportedAt: '2024-11-29 04:20',
-    },
-    {
-      id: '6',
-      ticketNumber: 'TKT-2024-1140',
-      bank: 'Stanbic IBTC',
-      location: 'VI Annexe, Lagos',
-      terminalId: 'STB-VI-0334',
-      fault: 'Card retention issue',
-      priority: 'medium',
-      status: 'on-site',
-      assignedTo: 'Eng. Ibrahim Musa',
-      reportedAt: '2024-11-28 22:15',
-    },
-    {
-      id: '7',
-      ticketNumber: 'TKT-2024-1139',
-      bank: 'Ecobank',
-      location: 'Yaba Tech, Lagos',
-      terminalId: 'ECO-YB-0556',
-      fault: 'Power supply failure',
-      priority: 'low',
-      status: 'completed',
-      assignedTo: 'Eng. Ngozi Eze',
-      reportedAt: '2024-11-28 20:00',
-    },
-    {
-      id: '8',
-      ticketNumber: 'TKT-2024-1138',
-      bank: 'GTBank',
-      location: 'Ajah Roundabout, Lagos',
-      terminalId: 'GTB-AJ-0889',
-      fault: 'Software update required',
-      priority: 'low',
-      status: 'assigned',
-      assignedTo: 'Eng. Blessing Nwosu',
-      reportedAt: '2024-11-28 18:30',
-    },
-  ];
+  // ...removed sampleTickets...
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {

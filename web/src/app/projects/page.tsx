@@ -50,8 +50,7 @@ export default function ProjectsPage() {
       const token = localStorage.getItem('token');
       
       if (!token) {
-        // If no token, use sample data for demo
-        setProjects(sampleProjects);
+        setError('No authentication token found.');
         setLoading(false);
         return;
       }
@@ -67,13 +66,11 @@ export default function ProjectsPage() {
         const data = await response.json();
         setProjects(data.data || []);
       } else {
-        // Fallback to sample data if API fails
-        setProjects(sampleProjects);
+        setError('Failed to fetch projects.');
       }
     } catch (err) {
       console.error('Error fetching projects:', err);
-      // Use sample data as fallback
-      setProjects(sampleProjects);
+      setError('Failed to fetch projects.');
     } finally {
       setLoading(false);
     }
@@ -107,13 +104,7 @@ export default function ProjectsPage() {
       const token = localStorage.getItem('token');
       
       if (!token) {
-        // Sample closed clients for demo
-        setClosedClients([
-          { _id: '1', clientName: 'GTBank', company: 'Guaranty Trust Bank', email: 'contact@gtbank.com' },
-          { _id: '2', clientName: 'Access Bank', company: 'Access Bank Plc', email: 'info@accessbank.com' },
-          { _id: '3', clientName: 'Zenith Bank', company: 'Zenith Bank Plc', email: 'support@zenithbank.com' },
-          { _id: '4', clientName: 'UBA', company: 'United Bank for Africa', email: 'contact@ubagroup.com' }
-        ]);
+        setError('No authentication token found.');
         return;
       }
 
@@ -128,29 +119,15 @@ export default function ProjectsPage() {
         const data = await response.json();
         setClosedClients(data.data || []);
       } else {
-        // Fallback to sample data
-        setClosedClients([
-          { _id: '1', clientName: 'GTBank', company: 'Guaranty Trust Bank', email: 'contact@gtbank.com' },
-          { _id: '2', clientName: 'Access Bank', company: 'Access Bank Plc', email: 'info@accessbank.com' },
-          { _id: '3', clientName: 'Zenith Bank', company: 'Zenith Bank Plc', email: 'support@zenithbank.com' },
-          { _id: '4', clientName: 'UBA', company: 'United Bank for Africa', email: 'contact@ubagroup.com' }
-        ]);
+        setError('Failed to fetch closed clients.');
       }
     } catch (err) {
       console.error('Error fetching closed clients:', err);
-      setClosedClients([
-        { _id: '1', clientName: 'GTBank', company: 'Guaranty Trust Bank', email: 'contact@gtbank.com' },
-        { _id: '2', clientName: 'Access Bank', company: 'Access Bank Plc', email: 'info@accessbank.com' }
-      ]);
+      setError('Failed to fetch closed clients.');
     }
   };
 
-  const sampleProjects = [
-    { id: '1', name: 'GTBank Software Upgrade', progress: 75, status: 'on-track', tasksCompleted: 18, totalTasks: 24, team: 8, deadline: 'Dec 15, 2024' },
-    { id: '2', name: 'Access Bank ATM Installation', progress: 45, status: 'delayed', tasksCompleted: 14, totalTasks: 32, team: 6, deadline: 'Dec 20, 2024' },
-    { id: '3', name: 'Zenith Bank Maintenance Contract', progress: 90, status: 'on-track', tasksCompleted: 18, totalTasks: 20, team: 4, deadline: 'Dec 5, 2024' },
-    { id: '4', name: 'UBA System Integration', progress: 30, status: 'at-risk', tasksCompleted: 12, totalTasks: 40, team: 10, deadline: 'Jan 15, 2025' },
-  ];
+  // ...removed sampleProjects...
 
   const milestones = [
     { project: 'Zenith Bank Maintenance', milestone: 'Final Testing', date: 'Dec 3, 2024', status: 'upcoming' },

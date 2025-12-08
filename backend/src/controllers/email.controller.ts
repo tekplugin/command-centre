@@ -66,6 +66,7 @@ export const updateSignature = async (req: Request, res: Response) => {
 
 export const getIncomingEmails = async (req: Request, res: Response) => {
   try {
+    res.set('Cache-Control', 'no-store');
     const { page = 1, limit = 50, isRead, isArchived = false } = req.query;
     const query: any = { isArchived: isArchived === 'true' };
     if (isRead !== undefined) query.isRead = isRead === 'true';
