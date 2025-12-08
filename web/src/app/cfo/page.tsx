@@ -66,9 +66,41 @@ type AccountReceivable = {
 };
 
 export default function FinancePage() {
+        // Remaining modal and handler state
+        const [showCashFlowModal, setShowCashFlowModal] = useState(false);
+        const [showBudgetModal, setShowBudgetModal] = useState(false);
+        const [showPayrollModal, setShowPayrollModal] = useState(false);
+        const [showProcurementModal, setShowProcurementModal] = useState(false);
+        const [payrollSubmissions, setPayrollSubmissions] = useState<any[]>([]);
+        const [procurementRequests, setProcurementRequests] = useState<any[]>([]);
+        const handleApprove = () => {};
+        const handleReject = () => {};
+        const handleMarkPaid = () => {};
+      // Additional missing state declarations
+      const [assets, setAssets] = useState<any[]>([]);
+      const [bankAccount, setBankAccount] = useState<string>('');
+      const [showInvoiceDetailsModal, setShowInvoiceDetailsModal] = useState(false);
+      const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+      const [emailData, setEmailData] = useState({ to: '', subject: '', message: '' });
+      const [isSendingEmail, setIsSendingEmail] = useState(false);
+    // Currency and exchange rate state
+    const [currency, setCurrency] = useState<'USD' | 'NGN'>('NGN');
+    const [exchangeRate, setExchangeRate] = useState<number>(1);
+
+    // Data state
+    const [invoices, setInvoices] = useState<any[]>([]);
+    const [accountsReceivable, setAccountsReceivable] = useState<any[]>([]);
+    const [expenses, setExpenses] = useState<any[]>([]);
+    const [revenues, setRevenues] = useState<any[]>([]);
+
+    // Fetch exchange rate function
+    const fetchExchangeRate = async () => {
+      // Example: fetch from API or set static value
+      // setExchangeRate(await fetchRateFromAPI());
+      setExchangeRate(1200); // Set to a static value for now
+    };
   // For bank balance logic
   const [lastBalance, setLastBalance] = useState<number>(0);
-  const [currentBalance, setCurrentBalance] = useState<number>(0);
 
   // For invoice form logic
   const [formData, setFormData] = useState<any>({});
@@ -97,8 +129,12 @@ export default function FinancePage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedPayrolls = localStorage.getItem('payroll_submissions');
-
       // ...existing code...
+    }
+  }, []);
+
+  // Poll exchange rate every hour
+  useEffect(() => {
     fetchExchangeRate();
     const interval = setInterval(fetchExchangeRate, 3600000);
     return () => clearInterval(interval);
@@ -259,7 +295,6 @@ export default function FinancePage() {
         
         // Update balances
         setLastBalance(previousBalance);
-        setCurrentBalance(newBalance);
         localStorage.setItem('last_bank_balance', newBalance.toString());
       }
     } catch (error) {
