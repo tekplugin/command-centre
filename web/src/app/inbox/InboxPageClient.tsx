@@ -607,7 +607,7 @@ export default function MailPageClient() {
         )}
         {showComposeModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-            <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-6 relative">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-6 relative overflow-y-auto max-h-[90vh] flex flex-col">
               <button
                 className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
                 onClick={() => {
@@ -615,11 +615,13 @@ export default function MailPageClient() {
                   setSendError(null);
                   setSendSuccess(false);
                 }}
+                aria-label="Close compose"
               >
                 ✖️
               </button>
               <h2 className="text-xl font-semibold mb-4">Compose Email</h2>
               <form
+                className="flex flex-col flex-1"
                 onSubmit={async (e) => {
                   e.preventDefault();
                   setSending(true);
@@ -749,7 +751,7 @@ export default function MailPageClient() {
                 </div>
                 {sendError && <div className="text-red-600 mb-2">{sendError}</div>}
                 {sendSuccess && <div className="text-green-600 mb-2">Email sent successfully!</div>}
-                <div className="flex justify-end gap-2 mt-4">
+                <div className="sticky bottom-0 left-0 right-0 bg-white pt-2 pb-2 flex justify-end gap-2 border-t mt-4 z-10">
                   <button
                     type="button"
                     className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium"
