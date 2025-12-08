@@ -1650,13 +1650,15 @@ The invoice has been saved in the system.
       )}
 
       {/* Payroll Approval - Nigerian System */}
-      <PayrollApproval
-        payrolls={payrollSubmissions}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onMarkPaid={handleMarkPaid}
-        onClose={() => setShowPayrollModal(false)}
-      />
+      {showPayrollModal && (
+        <PayrollApproval
+          payrolls={payrollSubmissions}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onMarkPaid={handleMarkPaid}
+          onClose={() => setShowPayrollModal(false)}
+        />
+      )}
 
       {/* Cash Flow Modal */}
       {showCashFlowModal && (
