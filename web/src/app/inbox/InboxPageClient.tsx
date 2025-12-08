@@ -113,20 +113,8 @@ export default function MailPageClient() {
       });
       if (response.ok) {
         const result = await response.json();
-        // Filter emails for current user
-        let userEmail = '';
-        try {
-          const user = JSON.parse(localStorage.getItem('user') || '{}');
-          userEmail = user.email || '';
-        } catch {}
-        const filtered = (result.data || []).filter((email: Email) => {
-          return (
-            (email.to && email.to.includes(userEmail)) ||
-            (email.cc && Array.isArray(email.cc) && email.cc.includes(userEmail)) ||
-            (email.bcc && Array.isArray(email.bcc) && email.bcc.includes(userEmail))
-          );
-        });
-        setEmails(filtered);
+        // Show all emails for debugging
+        setEmails(result.data || []);
       } else {
         console.error('Failed to fetch emails');
       }
