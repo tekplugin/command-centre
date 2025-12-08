@@ -1,4 +1,10 @@
 import { Request, Response } from 'express';
+import { JwtPayload } from 'jsonwebtoken';
+
+interface CustomJwtPayload extends JwtPayload {
+  id?: string;
+  email?: string;
+}
 import emailService from '../services/emailService';
 import IncomingEmail from '../models/IncomingEmail';
 import DraftEmail from '../models/DraftEmail';
@@ -196,25 +202,7 @@ export const bulkUpdate = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
-export const getDrafts = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id || req.user?.email;
-    const drafts = await DraftEmail.find({ user: userId }).sort({ updatedAt: -1 });
-    return res.status(200).json({ success: true, data: drafts });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-export const saveDraft = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id || req.user?.email;
-    const draft = new DraftEmail({ ...req.body, user: userId });
-    await draft.save();
-    return res.status(201).json({ success: true, data: draft });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
+// ...existing code...
 export const updateDraft = async (req: Request, res: Response) => {
   try {
     const draft = await DraftEmail.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -232,17 +220,7 @@ export const deleteDraft = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
-export const scheduleEmail = async (req: Request, res: Response) => {
-  try {
-    // For demo: just save as draft with scheduledAt
-    const userId = req.user?.id || req.user?.email;
-    const draft = new DraftEmail({ ...req.body, user: userId, scheduledAt: req.body.scheduledAt });
-    await draft.save();
-    return res.status(201).json({ success: true, data: draft });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
+// ...existing code...
 export const getReadReceipt = async (req: Request, res: Response) => {
   try {
     const email = await IncomingEmail.findById(req.params.id);
@@ -262,34 +240,12 @@ export const updateReadReceipt = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
-export const getSignature = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id || req.user?.email;
-    const signature = await Signature.findOne({ user: userId });
-    return res.status(200).json({ success: true, data: signature?.signature || '' });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-export const updateSignature = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id || req.user?.email;
-    const { signature } = req.body;
-    const updated = await Signature.findOneAndUpdate(
-      { user: userId },
-      { signature },
-      { upsert: true, new: true }
-    );
-    return res.status(200).json({ success: true, data: updated.signature });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
+// ...existing code...
 export const getAttachmentUrl = async (req: Request, res: Response) => {
   try {
     const email = await IncomingEmail.findById(req.params.id);
     if (!email) return res.status(404).json({ success: false, message: 'Email not found' });
-    const att = email.attachments.find(a => a._id?.toString() === req.params.attId || a.url === req.params.attId);
+    const att = email.attachments.find(a => a.url === req.params.attId);
     if (!att || !att.url) return res.status(404).json({ success: false, message: 'Attachment not found' });
     return res.redirect(att.url);
   } catch (error: any) {
