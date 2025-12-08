@@ -14,8 +14,8 @@ export default function ProjectsPage() {
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [projects, setProjects] = useState<any[]>([]);
   const [closedClients, setClosedClients] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'on-track' | 'at-risk' | 'completed'>('all');
   const [formData, setFormData] = useState({
     name: '',
@@ -35,6 +35,8 @@ export default function ProjectsPage() {
     dueDate: string;
     completed: boolean;
   }>>([]);
+
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Fetch projects and clients from API
   useEffect(() => {
@@ -469,6 +471,10 @@ ${project.recommendations && project.recommendations.length > 0 ? '\nRecommendat
     return true;
   });
 
+  const handleFilterChange = (status: 'all' | 'active' | 'on-track' | 'at-risk' | 'completed') => {
+    setFilterStatus(status);
+  };
+
   return (
     <DashboardLayout>
       <div className="py-6">
@@ -495,9 +501,8 @@ ${project.recommendations && project.recommendations.length > 0 ? '\nRecommendat
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 mt-6">
           {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="mt-2 text-gray-600">Loading projects...</p>
+            <div className="flex items-center justify-center h-96">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
             </div>
           ) : (
             <>

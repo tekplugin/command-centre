@@ -24,6 +24,85 @@ import { PayrollSubmission } from '@/utils/nigerianPayroll';
  * Add 'block' class to span elements when needed for proper display.
  */
 
+type Transaction = {
+  id: string;
+  amount: number;
+  description: string;
+  date: string;
+  category?: string;
+};
+
+type Invoice = {
+  id: string;
+  amount: number;
+  dueDate: string;
+  status: string;
+  client: string;
+  invoiceNumber?: string;
+  issueDate?: string;
+  items?: Array<{ description: string; quantity: number; rate: number; amount: number }>;
+  vat?: number;
+  notes?: string;
+  initialPayment?: number;
+  initialPaymentDate?: string;
+  balancePaymentDate?: string;
+  totalAmount?: number;
+};
+
+type AccountReceivable = {
+  id: string;
+  client: string;
+  amount: number;
+  dueDate: string;
+  isPaid?: boolean;
+  amountNumeric?: number;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  status?: string;
+  isPartialPayment?: boolean;
+  initialPayment?: number;
+  totalAmount?: number;
+  paidDate?: string;
+};
+
+export default function FinancePage() {
+  // For bank balance logic
+  const [lastBalance, setLastBalance] = useState<number>(0);
+  const [currentBalance, setCurrentBalance] = useState<number>(0);
+
+  // For invoice form logic
+  const [formData, setFormData] = useState<any>({});
+  const [invoiceData, setInvoiceData] = useState<any>({ items: [], vat: 7.5, notes: '' });
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showInvoiceDetailsModal, setShowInvoiceDetailsModal] = useState(false);
+  const [showPayrollModal, setShowPayrollModal] = useState(false);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [showProcurementModal, setShowProcurementModal] = useState(false);
+  const [showCashFlowModal, setShowCashFlowModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [payrollSubmissions, setPayrollSubmissions] = useState<PayrollSubmission[]>([]);
+  const [procurementRequests, setProcurementRequests] = useState<any[]>([]);
+  const [assets, setAssets] = useState<any[]>([]);
+  const [revenues, setRevenues] = useState<Transaction[]>([]);
+  const [expenses, setExpenses] = useState<Transaction[]>([]);
+  const [currency, setCurrency] = useState<'USD' | 'NGN'>('NGN');
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [accountsReceivable, setAccountsReceivable] = useState<AccountReceivable[]>([]);
+  const [bankAccount, setBankAccount] = useState<string>('');
+  const [emailData, setEmailData] = useState({ to: '', subject: '', message: '' });
+
+  // Fetch exchange rate (dummy implementation)
+  const fetchExchangeRate = async () => {
+    // Replace with real API if needed
+    setExchangeRate(1500); // Example: 1 USD = 1500 NGN
+  };
+
+
 export default function FinancePage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -38,6 +117,14 @@ export default function FinancePage() {
   const [payrollSubmissions, setPayrollSubmissions] = useState<PayrollSubmission[]>([]);
   const [procurementRequests, setProcurementRequests] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
+  const [revenues, setRevenues] = useState<Transaction[]>([]);
+  const [expenses, setExpenses] = useState<Transaction[]>([]);
+  const [currency, setCurrency] = useState<'USD' | 'NGN'>('NGN');
+  const [exchangeRate, setExchangeRate] = useState<number>(1); // <-- make sure this is before fetchExchangeRate
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [accountsReceivable, setAccountsReceivable] = useState<AccountReceivable[]>([]);
+  const [bankAccount, setBankAccount] = useState<string>('');
+  const [emailData, setEmailData] = useState({ to: '', subject: '', message: '' });
   
   // Load assets from localStorage
   useEffect(() => {
@@ -130,10 +217,13 @@ export default function FinancePage() {
       );
       setPayrollSubmissions(updatedPayrolls);
       localStorage.setItem('payroll_submissions', JSON.stringify(updatedPayrolls));
-    };
-    
+    }
     fetchExchangeRate();
-    // Refresh rate every hour
+  };
+
+  // Refresh rate every hour
+  useEffect(() => {
+    fetchExchangeRate();
     const interval = setInterval(fetchExchangeRate, 3600000);
     return () => clearInterval(interval);
   }, []);
@@ -307,7 +397,7 @@ export default function FinancePage() {
     
     // Try to match the inflow amount to invoice amounts (with 1% tolerance for fees)
     for (const receivable of unpaidReceivables) {
-      const invoiceAmount = receivable.amountNumeric;
+      const invoiceAmount = receivable.amountNumeric ?? 0;
       const tolerance = invoiceAmount * 0.01; // 1% tolerance
       
       if (Math.abs(inflowAmount - invoiceAmount) <= tolerance) {
@@ -593,8 +683,8 @@ export default function FinancePage() {
         amount: fullInvoice.amount,
         issueDate: fullInvoice.issueDate,
         dueDate: fullInvoice.dueDate,
-        items: invoiceData.items.filter(item => item.description).length > 0 
-          ? invoiceData.items.filter(item => item.description)
+        items: (invoiceData.items as Array<{ description: string; quantity: number; rate: number; amount: number }>).filter((item: { description: string }) => item.description).length > 0 
+          ? (invoiceData.items as Array<{ description: string; quantity: number; rate: number; amount: number }>).filter((item: { description: string }) => item.description)
           : [{ description: 'ATM Maintenance Services', quantity: 1, rate: fullInvoice.amount, amount: fullInvoice.amount }],
         vat: invoiceData.vat || 7.5,
         notes: invoiceData.notes || '',
@@ -635,7 +725,9 @@ export default function FinancePage() {
       } catch (fetchError) {
         // Backend not available - show email preview instead
         console.warn('Email backend not available, showing preview:', fetchError);
-        
+
+        const safeIssueDate = invoicePayload.issueDate ? new Date(invoicePayload.issueDate).toLocaleDateString() : 'N/A';
+        const safeDueDate = invoicePayload.dueDate ? new Date(invoicePayload.dueDate).toLocaleDateString() : 'N/A';
         const emailPreview = `
 📧 EMAIL PREVIEW (Backend not running)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -651,8 +743,8 @@ INVOICE DETAILS:
 Invoice #: ${invoicePayload.invoiceNumber}
 Client: ${invoicePayload.client}
 Amount: ${formatCurrency(invoicePayload.amount)}
-Issue Date: ${new Date(invoicePayload.issueDate).toLocaleDateString()}
-Due Date: ${new Date(invoicePayload.dueDate).toLocaleDateString()}
+Issue Date: ${safeIssueDate}
+Due Date: ${safeDueDate}
 
 ⚠️ NOTE: Email backend is not running. To send actual emails:
 1. Start the backend server: npm run dev (in backend folder)
@@ -702,6 +794,10 @@ The invoice has been saved in the system.
   const totalAssetValue = assets.reduce((sum, asset) => sum + (asset.currentValue * asset.quantity), 0);
   const totalAssetPurchase = assets.reduce((sum, asset) => sum + (asset.purchasePrice * asset.quantity), 0);
   const assetAppreciation = totalAssetValue - totalAssetPurchase;
+
+  // Ensure currentBalance is defined and accessible
+  const currentBalance = revenues.reduce((sum: number, rev: Transaction) => sum + rev.amount, 0)
+    - expenses.reduce((sum: number, exp: Transaction) => sum + exp.amount, 0);
 
   // Calculate financial metrics from actual data
   const totalRevenue = revenues.reduce((sum, rev) => sum + rev.amount, 0);
@@ -1135,7 +1231,7 @@ The invoice has been saved in the system.
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Create Invoice</h2>
             <form onSubmit={(e) => {
               e.preventDefault();
-              const total = invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) * (1 + invoiceData.vat / 100);
+              const total = (invoiceData.items as Array<{ amount: string }>).reduce((sum: number, item: { amount: string }) => sum + (parseFloat(item.amount) || 0), 0) * (1 + (invoiceData.vat || 0) / 100);
               const initialPaymentAmount = parseFloat(invoiceData.initialPayment) || 0;
               const balanceAmount = total - initialPaymentAmount;
               
@@ -1184,7 +1280,7 @@ The invoice has been saved in the system.
                   isPaid: false,
                   isPartialPayment: initialPaymentAmount > 0,
                 };
-                setAccountsReceivable([newReceivable, ...accountsReceivable]);
+                setAccountsReceivable([{ id: Date.now().toString(), ...newReceivable, amount: Number(newReceivable.amount) }, ...accountsReceivable]);
               }
               
               console.log('New invoice:', invoiceData);
@@ -1280,7 +1376,7 @@ The invoice has been saved in the system.
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Line Items</label>
-                  {invoiceData.items.map((item, index) => (
+                  {(invoiceData.items as Array<any>).map((item: any, index: number) => (
                     <div key={index} className="grid grid-cols-12 gap-2 mb-2">
                       <input
                         type="text"
@@ -1333,7 +1429,7 @@ The invoice has been saved in the system.
                       <button
                         type="button"
                         onClick={() => {
-                          const newItems = invoiceData.items.filter((_, i) => i !== index);
+                          const newItems = (invoiceData.items as Array<any>).filter((_: any, i: number) => i !== index);
                           setInvoiceData({...invoiceData, items: newItems.length ? newItems : [{ description: '', quantity: 1, rate: '', amount: '' }]});
                         }}
                         className="col-span-1 text-red-600 hover:text-red-800"
@@ -1358,7 +1454,7 @@ The invoice has been saved in the system.
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Subtotal:</span>
                       <span className="font-semibold text-gray-900">
-                        {formatCurrency(invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0))}
+                        {formatCurrency((invoiceData.items as Array<any>).reduce((sum: number, item: any) => sum + (parseFloat(item.amount) || 0), 0))}
                       </span>
                     </div>
                     
@@ -1379,7 +1475,7 @@ The invoice has been saved in the system.
                       <span className="text-gray-600">VAT Amount:</span>
                       <span className="font-semibold text-gray-900">
                         {formatCurrency(
-                          invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) * 
+                          (invoiceData.items as Array<any>).reduce((sum: number, item: any) => sum + (parseFloat(item.amount) || 0), 0) *
                           (invoiceData.vat / 100)
                         )}
                       </span>
@@ -1389,7 +1485,7 @@ The invoice has been saved in the system.
                       <span className="text-gray-900">Total Amount:</span>
                       <span className="text-gray-900">
                         {formatCurrency(
-                          invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) * 
+                          (invoiceData.items as Array<any>).reduce((sum: number, item: any) => sum + (parseFloat(item.amount) || 0), 0) *
                           (1 + invoiceData.vat / 100)
                         )}
                       </span>
@@ -1445,23 +1541,7 @@ The invoice has been saved in the system.
                         onChange={(e) => setInvoiceData({...invoiceData, balancePaymentDate: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
                       />
-                      <p className="mt-1 text-xs text-gray-500">Leave empty to use due date</p>
                     </div>
-
-                    {invoiceData.initialPayment && parseFloat(invoiceData.initialPayment) > 0 && (
-                      <div className="bg-blue-50 p-3 rounded-md">
-                        <p className="text-xs font-medium text-blue-900 mb-1">Payment Summary:</p>
-                        <p className="text-xs text-blue-800">
-                          Initial: {formatCurrency(parseFloat(invoiceData.initialPayment))}
-                        </p>
-                        <p className="text-xs text-blue-800">
-                          Balance: {formatCurrency(
-                            (invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) * (1 + invoiceData.vat / 100)) - 
-                            parseFloat(invoiceData.initialPayment)
-                          )}
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1647,12 +1727,7 @@ The invoice has been saved in the system.
                 Send Invoice
               </button>
               <button
-                onClick={() => handleDeleteInvoice(selectedInvoice)}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-medium"
-              >
-                Cancel Invoice
-              </button>
-              <button
+
                 onClick={() => setShowInvoiceDetailsModal(false)}
                 className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium"
               >
@@ -1664,15 +1739,13 @@ The invoice has been saved in the system.
       )}
 
       {/* Payroll Approval - Nigerian System */}
-      {showPayrollModal && (
-        <PayrollApproval
-          payrolls={payrollSubmissions}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onMarkPaid={handleMarkPaid}
-          onClose={() => setShowPayrollModal(false)}
-        />
-      )}
+      <PayrollApproval
+        payrolls={payrollSubmissions}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onMarkPaid={handleMarkPaid}
+        onClose={() => setShowPayrollModal(false)}
+      />
 
       {/* Cash Flow Modal */}
       {showCashFlowModal && (
@@ -1887,7 +1960,7 @@ The invoice has been saved in the system.
                         
                         const expenseCategories = categoryMap[category] || [];
                         const total = expenses
-                          .filter(exp => expenseCategories.includes(exp.category))
+                          .filter(exp => exp.category && expenseCategories.includes(exp.category))
                           .reduce((sum, exp) => sum + exp.amount, 0);
                         
                         return total || '';

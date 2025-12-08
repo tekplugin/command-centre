@@ -30,16 +30,18 @@ export default function TicketsPage() {
     contactName: '',
     contactPhone: '',
   });
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Load tickets from localStorage
   useEffect(() => {
-    const savedTickets = localStorage.getItem('tickets');
-    if (savedTickets) {
-      try {
-        setTickets(JSON.parse(savedTickets));
-      } catch (e) {
-        console.error('Error loading tickets:', e);
-      }
+    try {
+      const savedTickets = localStorage.getItem('company_tickets');
+      if (savedTickets) setTickets(JSON.parse(savedTickets));
+      setLoading(false);
+    } catch (e: any) {
+      setError('Failed to load tickets.');
+      setLoading(false);
     }
   }, []);
 
@@ -162,14 +164,13 @@ export default function TicketsPage() {
     }
   };
 
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.ticketNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.bank.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.terminalId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredTickets = tickets.filter(ticket =>
+    (statusFilter === 'all' || ticket.status === statusFilter) &&
+    (ticket.ticketNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     ticket.bank.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     ticket.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     ticket.terminalId.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   const statusCounts = {
     all: tickets.length,
@@ -418,6 +419,22 @@ export default function TicketsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Spinner */}
+      {loading && (
+        <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+          <div className="text-red-600 text-center mt-8">
+            {error}
           </div>
         </div>
       )}

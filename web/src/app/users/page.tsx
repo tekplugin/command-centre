@@ -61,6 +61,7 @@ export default function UsersPage() {
   const [filterDepartment, setFilterDepartment] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -269,183 +270,83 @@ export default function UsersPage() {
     }));
   };
 
-  // Filter users
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = !filterRole || user.roles.includes(filterRole);
-    const matchesDept = !filterDepartment || user.departments.includes(filterDepartment);
-    
-    return matchesSearch && matchesRole && matchesDept;
-  });
+  useEffect(() => {
+    try {
+      const savedUsers = localStorage.getItem('company_users');
+      if (savedUsers) setUsers(JSON.parse(savedUsers));
+      setLoading(false);
+    } catch (e: any) {
+      setError('Failed to load users.');
+      setLoading(false);
+    }
+  }, []);
+
+  const filteredUsers = users.filter(user =>
+    (filterRole === '' || user.roles.includes(filterRole)) &&
+    (`${user.firstName} ${user.lastName} ${user.email}`.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div></div>;
+  }
+  if (error) {
+    return <div className="text-red-600 text-center mt-8">{error}</div>;
+  }
 
   return (
     <DashboardLayout>
-      <div className="p-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-            <p className="text-gray-600 mt-1">Manage users, roles, and department access</p>
-          </div>
-          <button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <PlusIcon className="w-5 h-5" />
-            Add User
-          </button>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Users</h1>
+          <button onClick={() => { setEditingUser(null); setShowModal(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition-all flex items-center gap-2"><PlusIcon className="h-5 w-5" /> Add User</button>
         </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-            <select
-              value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Roles</option>
-              {ROLES.map(role => (
-                <option key={role} value={role}>{role.toUpperCase()}</option>
-              ))}
-            </select>
-            <select
-              value={filterDepartment}
-              onChange={(e) => setFilterDepartment(e.target.value)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Departments</option>
-              {DEPARTMENTS.map(dept => (
-                <option key={dept} value={dept}>{dept.replace('_', ' ').toUpperCase()}</option>
-              ))}
-            </select>
-          </div>
+        <div className="mb-4 flex gap-2 flex-wrap">
+          <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search users..." className="border rounded px-3 py-2" />
+          <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="border rounded px-3 py-2">
+            <option value="">All Roles</option>
+            {ROLES.map(role => <option key={role} value={role}>{role}</option>)}
+          </select>
         </div>
-
-        {/* Users Table */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roles</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Departments</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white rounded-xl shadow-lg">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Email</th>
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Roles</th>
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Departments</th>
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Status</th>
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                    Loading users...
+            <tbody>
+              {filteredUsers.map(user => (
+                <tr key={user._id} className="hover:bg-blue-50 transition cursor-pointer">
+                  <td className="px-4 py-2 font-medium text-gray-900">{user.firstName} {user.lastName}</td>
+                  <td className="px-4 py-2 text-gray-700">{user.email}</td>
+                  <td className="px-4 py-2">
+                    {user.roles.map(role => <span key={role} className={`inline-block px-2 py-1 rounded mr-1 text-xs font-semibold ${ROLE_COLORS[role]}`}>{role}</span>)}
+                  </td>
+                  <td className="px-4 py-2">
+                    {user.departments.map(dept => <span key={dept} className={`inline-block px-2 py-1 rounded mr-1 text-xs font-semibold ${DEPT_COLORS[dept]}`}>{dept}</span>)}
+                  </td>
+                  <td className="px-4 py-2">
+                    {user.isActive ? <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-700 text-xs"><ShieldCheckIcon className="h-4 w-4 mr-1" />Active</span> : <span className="inline-flex items-center px-2 py-1 rounded bg-gray-200 text-gray-600 text-xs"><UserGroupIcon className="h-4 w-4 mr-1" />Inactive</span>}
+                  </td>
+                  <td className="px-4 py-2 flex gap-2">
+                    <button onClick={() => { setEditingUser(user); setShowModal(true); }} className="text-blue-600 hover:underline"><PencilIcon className="h-4 w-4 inline" /></button>
+                    <button onClick={() => {/* confirm and delete logic */}} className="text-red-600 hover:underline"><TrashIcon className="h-4 w-4 inline" /></button>
                   </td>
                 </tr>
-              ) : filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                    No users found
-                  </td>
-                </tr>
-              ) : (
-                filteredUsers.map(user => (
-                  <tr key={user._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                            {user.firstName[0]}{user.lastName[0]}
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {user.firstName} {user.lastName}
-                          </div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {user.roles.map(role => (
-                          <span
-                            key={role}
-                            className={`px-2 py-1 text-xs font-medium rounded-full ${ROLE_COLORS[role]}`}
-                          >
-                            {role.toUpperCase()}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {user.departments.length === 0 ? (
-                          <span className="text-xs text-gray-400">None</span>
-                        ) : (
-                          user.departments.slice(0, 3).map(dept => (
-                            <span
-                              key={dept}
-                              className={`px-2 py-1 text-xs font-medium rounded-full ${DEPT_COLORS[dept]}`}
-                            >
-                              {dept.replace('_', ' ')}
-                            </span>
-                          ))
-                        )}
-                        {user.departments.length > 3 && (
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
-                            +{user.departments.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {user.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => openEditModal(user)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <PencilIcon className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user._id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <TrashIcon className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>
-
-        {/* Create/Edit Modal */}
+        {/* User Modal (Add/Edit) */}
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-4">
-                {editingUser ? 'Edit User' : 'Create New User'}
-              </h2>
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 animate-fade-in">
+            <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-lg">
+              <h2 className="text-xl font-bold mb-4">{editingUser ? 'Edit User' : 'Add User'}</h2>
               
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">

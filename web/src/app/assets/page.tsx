@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
+import { FaCheckCircle, FaExclamationCircle, FaTimesCircle, FaQuestionCircle } from 'react-icons/fa';
 
 interface Asset {
   id: string;
@@ -30,6 +31,8 @@ export default function AssetsPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [filterClass, setFilterClass] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const assetClasses = [
     'Property & Buildings',
@@ -48,13 +51,13 @@ export default function AssetsPage() {
   ];
 
   useEffect(() => {
-    const savedAssets = localStorage.getItem('company_assets');
-    if (savedAssets) {
-      try {
-        setAssets(JSON.parse(savedAssets));
-      } catch (e) {
-        console.error('Error loading assets:', e);
-      }
+    try {
+      const savedAssets = localStorage.getItem('company_assets');
+      if (savedAssets) setAssets(JSON.parse(savedAssets));
+      setLoading(false);
+    } catch (e: any) {
+      setError('Failed to load assets.');
+      setLoading(false);
     }
   }, []);
 
@@ -111,8 +114,8 @@ export default function AssetsPage() {
     }).format(amount);
   };
 
-  const filteredAssets = filterClass === 'all' 
-    ? assets 
+  const filteredAssets = filterClass === 'all'
+    ? assets
     : assets.filter(a => a.assetClass === filterClass);
 
   const totalPurchaseValue = filteredAssets.reduce((sum, a) => sum + (a.purchasePrice * a.quantity), 0);
@@ -127,150 +130,69 @@ export default function AssetsPage() {
     value: assets.filter(a => a.assetClass === className).reduce((sum, a) => sum + (a.currentValue * a.quantity), 0)
   })).filter(c => c.count > 0);
 
+  const getConditionBadge = (condition: Asset['condition']) => {
+    switch (condition) {
+      case 'excellent': return <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-700 text-xs"><FaCheckCircle className="mr-1" />Excellent</span>;
+      case 'good': return <span className="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs"><FaCheckCircle className="mr-1" />Good</span>;
+      case 'fair': return <span className="inline-flex items-center px-2 py-1 rounded bg-yellow-100 text-yellow-700 text-xs"><FaExclamationCircle className="mr-1" />Fair</span>;
+      case 'poor': return <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-700 text-xs"><FaTimesCircle className="mr-1" />Poor</span>;
+      default: return <span className="inline-flex items-center px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs"><FaQuestionCircle className="mr-1" />Unknown</span>;
+    }
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div></div>;
+  }
+  if (error) {
+    return <div className="text-red-600 text-center mt-8">{error}</div>;
+  }
+
   return (
     <DashboardLayout>
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Asset Management</h1>
-            <p className="text-gray-600 mt-1">Track assets, investments, and capital expenditure</p>
-          </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
-          >
-            + Add Asset
-          </button>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Company Assets</h1>
+          <button onClick={() => setShowAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition-all">+ Add Asset</button>
         </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600">Total Assets</div>
-            <div className="text-3xl font-bold text-gray-900 mt-2">{filteredAssets.length}</div>
-            <div className="text-xs text-gray-500 mt-1">{assetsByClass.length} categories</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600">Purchase Value</div>
-            <div className="text-3xl font-bold text-blue-600 mt-2">{formatCurrency(totalPurchaseValue)}</div>
-            <div className="text-xs text-gray-500 mt-1">Total invested</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600">Current Value</div>
-            <div className="text-3xl font-bold text-green-600 mt-2">{formatCurrency(totalCurrentValue)}</div>
-            <div className="text-xs text-gray-500 mt-1">Market value</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600">Appreciation</div>
-            <div className={`text-3xl font-bold mt-2 ${totalAppreciation >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {appreciationPercent >= 0 ? '+' : ''}{appreciationPercent.toFixed(1)}%
-            </div>
-            <div className="text-xs text-gray-500 mt-1">{formatCurrency(totalAppreciation)}</div>
-          </div>
-        </div>
-
-        {/* Filter by Asset Class */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Asset Class</label>
-          <select
-            value={filterClass}
-            onChange={(e) => setFilterClass(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
-          >
-            <option value="all">All Assets ({assets.length})</option>
-            {assetsByClass.map(ac => (
-              <option key={ac.name} value={ac.name}>
-                {ac.name} ({ac.count}) - {formatCurrency(ac.value)}
-              </option>
-            ))}
+        <div className="mb-4 flex gap-2 flex-wrap">
+          <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className="border rounded px-3 py-2">
+            <option value="all">All Classes</option>
+            {assetClasses.map(cls => <option key={cls} value={cls}>{cls}</option>)}
           </select>
         </div>
-
-        {/* Assets List */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b">
-            <h3 className="text-lg font-semibold text-gray-900">
-              {filterClass === 'all' ? 'All Assets' : filterClass}
-            </h3>
-          </div>
-          <div className="overflow-x-auto">
-            {filteredAssets.length > 0 ? (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purchase Date</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Purchase Price</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Current Value</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Condition</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredAssets.map((asset) => {
-                    const appreciation = ((asset.currentValue - asset.purchasePrice) / asset.purchasePrice * 100);
-                    return (
-                      <tr key={asset.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{asset.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{asset.assetClass}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {new Date(asset.purchaseDate).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                          {formatCurrency(asset.purchasePrice * asset.quantity)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                          {formatCurrency(asset.currentValue * asset.quantity)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-600">{asset.quantity}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            asset.condition === 'excellent' ? 'bg-green-100 text-green-800' :
-                            asset.condition === 'good' ? 'bg-blue-100 text-blue-800' :
-                            asset.condition === 'fair' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {asset.condition}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                          <button
-                            onClick={() => {
-                              setSelectedAsset(asset);
-                              setShowDetailModal(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : (
-              <div className="text-center py-12 text-gray-500">
-                <div className="text-6xl mb-4">📊</div>
-                <p className="text-lg font-medium">No assets found</p>
-                <p className="text-sm mt-2">
-                  {filterClass === 'all' 
-                    ? 'Start tracking your assets and investments'
-                    : `No assets in ${filterClass} category`
-                  }
-                </p>
-              </div>
-            )}
-          </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white rounded-xl shadow-lg">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Name</th>
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Class</th>
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Value</th>
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Condition</th>
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Location</th>
+                <th className="px-4 py-2 text-left text-xs text-gray-600">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAssets.map(asset => (
+                <tr key={asset.id} className="hover:bg-blue-50 transition cursor-pointer">
+                  <td className="px-4 py-2 font-medium text-gray-900" onClick={() => { setSelectedAsset(asset); setShowDetailModal(true); }}>{asset.name}</td>
+                  <td className="px-4 py-2 text-gray-700">{asset.assetClass}</td>
+                  <td className="px-4 py-2 text-blue-700 font-bold">₦{asset.currentValue.toLocaleString()}</td>
+                  <td className="px-4 py-2">{getConditionBadge(asset.condition)}</td>
+                  <td className="px-4 py-2 text-gray-600">{asset.location || '-'}</td>
+                  <td className="px-4 py-2">
+                    <button onClick={() => { setSelectedAsset(asset); setShowDetailModal(true); }} className="text-blue-600 hover:underline">Details</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-
         {/* Add Asset Modal */}
         {showAddModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Asset</h2>
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 animate-fade-in">
+            <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-lg">
+              <h2 className="text-xl font-bold mb-4">Add New Asset</h2>
               <form onSubmit={handleAddAsset} id="assetForm">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -454,125 +376,18 @@ export default function AssetsPage() {
 
         {/* Asset Detail Modal */}
         {showDetailModal && selectedAsset && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{selectedAsset.name}</h2>
-                  <p className="text-sm text-gray-600 mt-1">{selectedAsset.assetClass}</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false);
-                    setSelectedAsset(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <div className="text-sm text-blue-600 font-medium">Purchase Value</div>
-                    <div className="text-2xl font-bold text-blue-700 mt-1">
-                      {formatCurrency(selectedAsset.purchasePrice * selectedAsset.quantity)}
-                    </div>
-                    <div className="text-xs text-blue-600 mt-1">
-                      {formatCurrency(selectedAsset.purchasePrice)} × {selectedAsset.quantity}
-                    </div>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <div className="text-sm text-green-600 font-medium">Current Value</div>
-                    <div className="text-2xl font-bold text-green-700 mt-1">
-                      {formatCurrency(selectedAsset.currentValue * selectedAsset.quantity)}
-                    </div>
-                    <div className="text-xs text-green-600 mt-1">
-                      {((selectedAsset.currentValue - selectedAsset.purchasePrice) / selectedAsset.purchasePrice * 100).toFixed(1)}% change
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">Asset Details</h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="text-gray-600">Purchase Date:</span>
-                      <p className="font-medium text-gray-900">{new Date(selectedAsset.purchaseDate).toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Condition:</span>
-                      <p className="font-medium text-gray-900 capitalize">{selectedAsset.condition}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Quantity:</span>
-                      <p className="font-medium text-gray-900">{selectedAsset.quantity}</p>
-                    </div>
-                    {selectedAsset.depreciationRate && (
-                      <div>
-                        <span className="text-gray-600">Depreciation Rate:</span>
-                        <p className="font-medium text-gray-900">{selectedAsset.depreciationRate}%</p>
-                      </div>
-                    )}
-                    {selectedAsset.interestRate && (
-                      <div>
-                        <span className="text-gray-600">Interest Rate (p.a.):</span>
-                        <p className="font-medium text-gray-900">{selectedAsset.interestRate}%</p>
-                      </div>
-                    )}
-                    {selectedAsset.nextInterestDate && (
-                      <div>
-                        <span className="text-gray-600">Next Interest Date:</span>
-                        <p className="font-medium text-gray-900">
-                          {new Date(selectedAsset.nextInterestDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                    )}
-                    {selectedAsset.location && (
-                      <div>
-                        <span className="text-gray-600">Location:</span>
-                        <p className="font-medium text-gray-900">{selectedAsset.location}</p>
-                      </div>
-                    )}
-                    {selectedAsset.serialNumber && (
-                      <div>
-                        <span className="text-gray-600">Serial Number:</span>
-                        <p className="font-medium text-gray-900">{selectedAsset.serialNumber}</p>
-                      </div>
-                    )}
-                    {selectedAsset.supplier && (
-                      <div>
-                        <span className="text-gray-600">Supplier:</span>
-                        <p className="font-medium text-gray-900">{selectedAsset.supplier}</p>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-gray-600">Added By:</span>
-                      <p className="font-medium text-gray-900">{selectedAsset.addedBy}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {selectedAsset.notes && (
-                  <div className="border rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2">Notes</h3>
-                    <p className="text-sm text-gray-700">{selectedAsset.notes}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6">
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false);
-                    setSelectedAsset(null);
-                  }}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium"
-                >
-                  Close
-                </button>
-              </div>
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 animate-fade-in">
+            <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-lg">
+              <h2 className="text-xl font-bold mb-4">Asset Details</h2>
+              <div className="mb-2"><span className="font-semibold">Name:</span> {selectedAsset.name}</div>
+              <div className="mb-2"><span className="font-semibold">Class:</span> {selectedAsset.assetClass}</div>
+              <div className="mb-2"><span className="font-semibold">Value:</span> ₦{selectedAsset.currentValue.toLocaleString()}</div>
+              <div className="mb-2"><span className="font-semibold">Condition:</span> {getConditionBadge(selectedAsset.condition)}</div>
+              <div className="mb-2"><span className="font-semibold">Location:</span> {selectedAsset.location || '-'}</div>
+              <div className="mb-2"><span className="font-semibold">Serial Number:</span> {selectedAsset.serialNumber || '-'}</div>
+              <div className="mb-2"><span className="font-semibold">Supplier:</span> {selectedAsset.supplier || '-'}</div>
+              <div className="mb-2"><span className="font-semibold">Notes:</span> {selectedAsset.notes || '-'}</div>
+              <button onClick={() => setShowDetailModal(false)} className="mt-6 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded">Close</button>
             </div>
           </div>
         )}
