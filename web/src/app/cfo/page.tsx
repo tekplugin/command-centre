@@ -77,54 +77,7 @@ export default function FinancePage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [showInvoiceDetailsModal, setShowInvoiceDetailsModal] = useState(false);
-  const [showPayrollModal, setShowPayrollModal] = useState(false);
-  const [showBudgetModal, setShowBudgetModal] = useState(false);
-  const [showProcurementModal, setShowProcurementModal] = useState(false);
-  const [showCashFlowModal, setShowCashFlowModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [payrollSubmissions, setPayrollSubmissions] = useState<PayrollSubmission[]>([]);
-  const [procurementRequests, setProcurementRequests] = useState<any[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
-  const [revenues, setRevenues] = useState<Transaction[]>([]);
-  const [expenses, setExpenses] = useState<Transaction[]>([]);
-  const [currency, setCurrency] = useState<'USD' | 'NGN'>('NGN');
-  const [exchangeRate, setExchangeRate] = useState<number>(1);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [accountsReceivable, setAccountsReceivable] = useState<AccountReceivable[]>([]);
-  const [bankAccount, setBankAccount] = useState<string>('');
-  const [emailData, setEmailData] = useState({ to: '', subject: '', message: '' });
 
-  // Fetch exchange rate (dummy implementation)
-  const fetchExchangeRate = async () => {
-    // Replace with real API if needed
-    setExchangeRate(1500); // Example: 1 USD = 1500 NGN
-  };
-
-
-export default function FinancePage() {
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [showInvoiceDetailsModal, setShowInvoiceDetailsModal] = useState(false);
-  const [showPayrollModal, setShowPayrollModal] = useState(false);
-  const [showBudgetModal, setShowBudgetModal] = useState(false);
-  const [showProcurementModal, setShowProcurementModal] = useState(false);
-  const [showCashFlowModal, setShowCashFlowModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [payrollSubmissions, setPayrollSubmissions] = useState<PayrollSubmission[]>([]);
-  const [procurementRequests, setProcurementRequests] = useState<any[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
-  const [revenues, setRevenues] = useState<Transaction[]>([]);
-  const [expenses, setExpenses] = useState<Transaction[]>([]);
-  const [currency, setCurrency] = useState<'USD' | 'NGN'>('NGN');
-  const [exchangeRate, setExchangeRate] = useState<number>(1); // <-- make sure this is before fetchExchangeRate
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [accountsReceivable, setAccountsReceivable] = useState<AccountReceivable[]>([]);
-  const [bankAccount, setBankAccount] = useState<string>('');
-  const [emailData, setEmailData] = useState({ to: '', subject: '', message: '' });
   
   // Load assets from localStorage
   useEffect(() => {
@@ -144,85 +97,8 @@ export default function FinancePage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedPayrolls = localStorage.getItem('payroll_submissions');
-      if (savedPayrolls) {
-        try {
-          setPayrollSubmissions(JSON.parse(savedPayrolls));
-        } catch (e) {
-          console.error('Error loading payrolls:', e);
-        }
-      }
-    }
-  }, [showPayrollModal]);
 
-  // Load procurement requests
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedRequests = localStorage.getItem('procurement_requests');
-      if (savedRequests) {
-        try {
-          setProcurementRequests(JSON.parse(savedRequests));
-        } catch (e) {
-          console.error('Error loading procurement:', e);
-        }
-      }
-    }
-  }, [showProcurementModal]);
-
-  // Handle payroll approval
-  const handleApprove = (id: string, comments: string) => {
-    if (typeof window !== 'undefined') {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const updatedPayrolls = payrollSubmissions.map(p => 
-        p.id === id ? {
-          ...p,
-          status: 'approved' as const,
-          approvedBy: `${user.firstName} ${user.lastName}`,
-          approvedAt: new Date().toISOString()
-        } : p
-      );
-      setPayrollSubmissions(updatedPayrolls);
-      localStorage.setItem('payroll_submissions', JSON.stringify(updatedPayrolls));
-      alert('Payroll approved successfully!');
-    }
-  };
-
-  // Handle payroll rejection
-  const handleReject = (id: string, reason: string) => {
-    if (typeof window !== 'undefined') {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const updatedPayrolls = payrollSubmissions.map(p => 
-        p.id === id ? {
-          ...p,
-          status: 'rejected' as const,
-          rejectedBy: `${user.firstName} ${user.lastName}`,
-          rejectedAt: new Date().toISOString(),
-          rejectionReason: reason
-        } : p
-      );
-      setPayrollSubmissions(updatedPayrolls);
-      localStorage.setItem('payroll_submissions', JSON.stringify(updatedPayrolls));
-      alert('Payroll rejected');
-    }
-  };
-
-  // Handle mark as paid
-  const handleMarkPaid = (id: string) => {
-    if (typeof window !== 'undefined') {
-      const updatedPayrolls = payrollSubmissions.map(p => 
-        p.id === id ? {
-          ...p,
-          status: 'paid' as const,
-          paidAt: new Date().toISOString()
-        } : p
-      );
-      setPayrollSubmissions(updatedPayrolls);
-      localStorage.setItem('payroll_submissions', JSON.stringify(updatedPayrolls));
-    }
-    fetchExchangeRate();
-  };
-
-  // Refresh rate every hour
-  useEffect(() => {
+      // ...existing code...
     fetchExchangeRate();
     const interval = setInterval(fetchExchangeRate, 3600000);
     return () => clearInterval(interval);
