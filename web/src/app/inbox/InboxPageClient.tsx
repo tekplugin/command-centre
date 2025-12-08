@@ -99,7 +99,7 @@ export default function MailPageClient() {
       if (typeof window === 'undefined') return;
       const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      let url = `${apiUrl}/email/mail`;
+      let url = `${apiUrl}/email/inbox`;
       if (filter === 'unread') {
         url += '?isRead=false';
       } else if (filter === 'archived') {
@@ -143,7 +143,7 @@ export default function MailPageClient() {
         if (typeof window === 'undefined') return;
         const token = localStorage.getItem('token');
         const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-        await fetch(`${apiUrl}/email/mail/${email._id}/read`, {
+        await fetch(`${apiUrl}/email/inbox/${email._id}/read`, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -168,7 +168,7 @@ export default function MailPageClient() {
       if (typeof window === 'undefined') return;
       const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      await fetch(`${apiUrl}/email/mail/${emailId}/archive`, {
+      await fetch(`${apiUrl}/email/inbox/${emailId}/archive`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
