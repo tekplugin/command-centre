@@ -4,6 +4,7 @@
   "description": "Backend API for Command Centre Platform",
   "main": "dist/index.js",
   "scripts": {
+    "test-password-compare": "ts-node src/scripts/testPasswordCompare.ts",
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",

@@ -26,6 +26,36 @@ export interface IIncomingEmail extends Document {
   };
   createdAt: Date;
   updatedAt: Date;
+  starred: {
+    type: Boolean,
+    default: false,
+    index: true,
+  };
+  spam: {
+    type: Boolean,
+    default: false,
+    index: true,
+  };
+  deleted: {
+    type: Boolean,
+    default: false,
+    index: true,
+  };
+  folder: {
+    type: String,
+    default: 'Inbox',
+    index: true,
+  };
+  draft: {
+    type: Boolean,
+    default: false,
+    index: true,
+  };
+  readReceipt: {
+    type: String,
+    default: 'unrequested', // 'unrequested', 'requested', 'read', 'failed'
+    index: true,
+  };
 }
 
 const IncomingEmailSchema = new Schema<IIncomingEmail>(
@@ -101,6 +131,36 @@ const IncomingEmailSchema = new Schema<IIncomingEmail>(
       },
       id: String,
     },
+    starred: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    spam: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    folder: {
+      type: String,
+      default: 'Inbox',
+      index: true,
+    },
+    draft: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    readReceipt: {
+      type: String,
+      default: 'unrequested', // 'unrequested', 'requested', 'read', 'failed'
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -112,5 +172,11 @@ IncomingEmailSchema.index({ receivedAt: -1 });
 IncomingEmailSchema.index({ from: 1, receivedAt: -1 });
 IncomingEmailSchema.index({ isRead: 1, receivedAt: -1 });
 IncomingEmailSchema.index({ isArchived: 1, receivedAt: -1 });
+IncomingEmailSchema.index({ starred: 1, receivedAt: -1 });
+IncomingEmailSchema.index({ spam: 1, receivedAt: -1 });
+IncomingEmailSchema.index({ deleted: 1, receivedAt: -1 });
+IncomingEmailSchema.index({ folder: 1, receivedAt: -1 });
+IncomingEmailSchema.index({ draft: 1, receivedAt: -1 });
+IncomingEmailSchema.index({ readReceipt: 1, receivedAt: -1 });
 
 export default mongoose.model<IIncomingEmail>('IncomingEmail', IncomingEmailSchema);

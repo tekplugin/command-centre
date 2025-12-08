@@ -1,3 +1,3 @@
 import dynamic from 'next/dynamic';
-const InboxPageClient = dynamic(() => import('./InboxPageClient'), { ssr: false });
-export default InboxPageClient;
+const MailPageClient = dynamic(() => import('./InboxPageClient'), { ssr: false });
+export default MailPageClient;

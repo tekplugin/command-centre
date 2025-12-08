@@ -250,6 +250,55 @@ class EmailService {
       doc.end();
     });
   }
+
+  async scheduleEmail(options: EmailOptions & { scheduledAt: Date }): Promise<any> {
+    // Logic to queue email for future send
+  }
+  async starEmail(emailId: string, starred: boolean): Promise<any> {
+    // Logic to star/unstar email
+  }
+  async markSpam(emailId: string, spam: boolean): Promise<any> {
+    // Logic to mark email as spam
+  }
+  async deleteEmail(emailId: string): Promise<any> {
+    // Logic to delete email
+  }
+  async restoreEmail(emailId: string): Promise<any> {
+    // Logic to restore deleted email
+  }
+  async moveToFolder(emailId: string, folder: string): Promise<any> {
+    // Logic to move email to folder
+  }
+  async addLabel(emailId: string, label: string): Promise<any> {
+    // Logic to add label
+  }
+  async removeLabel(emailId: string, label: string): Promise<any> {
+    // Logic to remove label
+  }
+  async bulkUpdate(emailIds: string[], updates: any): Promise<any> {
+    // Logic for bulk actions
+  }
+  async saveDraft(draft: any): Promise<any> {
+    // Logic to save draft
+  }
+  async updateDraft(draftId: string, updates: any): Promise<any> {
+    // Logic to update draft
+  }
+  async deleteDraft(draftId: string): Promise<any> {
+    // Logic to delete draft
+  }
+  async getDrafts(userId: string): Promise<any> {
+    // Logic to get drafts for user
+  }
+  async getSignature(userId: string): Promise<any> {
+    // Logic to get user signature
+  }
+  async updateSignature(userId: string, signature: string): Promise<any> {
+    // Logic to update user signature
+  }
+  async getAttachmentUrl(emailId: string, attId: string): Promise<string> {
+    // Logic to get attachment download URL
+  }
 }
 
 export default new EmailService();

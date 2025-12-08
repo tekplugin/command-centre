@@ -1,9 +1,9 @@
-// Utility to fetch emails from the backend API (MongoDB)
+// Utility to fetch emails for the Mail system from the backend API (MongoDB)
 // Uses NEXT_PUBLIC_API_URL from environment variables
 
 export async function fetchEmails() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-  const response = await fetch(`${apiUrl}/email/inbox`, {
+  const response = await fetch(`${apiUrl}/email/mail`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',

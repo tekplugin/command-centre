@@ -1,3 +1,14 @@
+#!/bin/bash
+# Update Production Environment Configuration
+# Run this script in AWS Session Manager
+
+cd /home/ec2-user/command-centre/backend
+
+# Backup existing .env
+cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+
+# Create new .env file
+cat > .env << 'EOF'
 # Production Environment Variables
 NODE_ENV=production
 PORT=5000
@@ -59,10 +70,15 @@ CORS_ORIGIN=http://13.219.183.238:3000,http://localhost:3000
 # Rate Limiting
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
+EOF
 
-# Frontend URL - Update after deploying frontend
-FRONTEND_URL=http://localhost:3000
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
+echo ""
+echo "✅ Production .env file updated!"
+echo ""
+echo "Now restart the services:"
+echo "pm2 restart command-centre"
+echo "pm2 save"
+echo ""
+echo "Then test password reset:"
+echo "npm run reset-password ofolufemi@tekplugin.com 'YourPassword123!'"
+echo ""
