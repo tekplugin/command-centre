@@ -284,7 +284,7 @@ export default function FinancePage() {
         const newBalance = result.data.available_balance;
         
         // Calculate inflow
-        const savedLastBalance = localStorage.getItem('last_bank_balance');
+        const savedLastBalance = typeof window !== 'undefined' ? localStorage.getItem('last_bank_balance') : null;
         const previousBalance = savedLastBalance ? parseFloat(savedLastBalance) : newBalance;
         const inflow = newBalance - previousBalance;
         
@@ -302,7 +302,9 @@ export default function FinancePage() {
         
         // Update balances
         setLastBalance(previousBalance);
-        localStorage.setItem('last_bank_balance', newBalance.toString());
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('last_bank_balance', newBalance.toString());
+        }
       }
     } catch (error) {
       console.error('Error checking bank balance:', error);
@@ -577,7 +579,7 @@ export default function FinancePage() {
       console.log('Starting to send email...');
       
       // Get token from localStorage
-      const token = localStorage.getItem('token');
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       
       if (!token) {
         alert('Your session has expired. Please log in again.');
@@ -688,7 +690,7 @@ The invoice has been saved in the system.
   // Get clients who have legal documents (confirmed they have necessary docs)
   const getClientsWithLegalDocs = (): string[] => {
     try {
-      const legalDocs = localStorage.getItem('legal_documents');
+      const legalDocs = typeof window !== 'undefined' ? localStorage.getItem('legal_documents') : null;
       if (legalDocs) {
         const documents = JSON.parse(legalDocs);
         // Get unique client names who have Award Letter or Purchase Order
@@ -2034,7 +2036,9 @@ The invoice has been saved in the system.
                               r.id === request.id ? { ...r, status: 'approved', approvedBy: 'Finance', approvedAt: new Date().toISOString() } : r
                             );
                             setProcurementRequests(updatedRequests);
-                            localStorage.setItem('procurement_requests', JSON.stringify(updatedRequests));
+                            if (typeof window !== 'undefined') {
+                              localStorage.setItem('procurement_requests', JSON.stringify(updatedRequests));
+                            }
                             alert('✅ Purchase request approved!');
                           }}
                           className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium"
@@ -2049,7 +2053,9 @@ The invoice has been saved in the system.
                                 r.id === request.id ? { ...r, status: 'rejected', rejectionReason: reason, rejectedBy: 'Finance', rejectedAt: new Date().toISOString() } : r
                               );
                               setProcurementRequests(updatedRequests);
-                              localStorage.setItem('procurement_requests', JSON.stringify(updatedRequests));
+                              if (typeof window !== 'undefined') {
+                                localStorage.setItem('procurement_requests', JSON.stringify(updatedRequests));
+                              }
                               alert('❌ Purchase request rejected');
                             }
                           }}
