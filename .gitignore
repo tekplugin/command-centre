@@ -14,6 +14,9 @@ backend/.env.*
 web/.env
 web/.env.*
 
+# Ignore production environment file for web app
+web/.env.production
+
 # Build outputs
 dist/
 build/
