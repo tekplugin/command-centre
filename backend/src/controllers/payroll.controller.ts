@@ -2,41 +2,7 @@
 import { Request, Response } from 'express';
 import Payroll from '../models/Payroll';
 
-// Payroll submission interface
-interface PayrollEmployee {
-  id: string;
-  employeeId: string;
-  name: string;
-  department: string;
-  position: string;
-  basicSalary: number;
-  housingAllowance: number;
-  transportAllowance: number;
-  otherAllowances: number;
-  loan?: number;
-  advance?: number;
-  otherDeductions?: number;
-}
 
-interface PayrollSubmission {
-  id: string;
-  month: string;
-  year: string;
-  employees: PayrollEmployee[];
-  totalGross: number;
-  totalNet: number;
-  totalDeductions: number;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'paid';
-  submittedBy: string;
-  submittedAt: string;
-  approvedBy?: string;
-  approvedAt?: string;
-  rejectedBy?: string;
-  rejectedAt?: string;
-  rejectionReason?: string;
-  paidAt?: string;
-  companyId: string;
-}
 
 // Remove in-memory storage. All payrolls are now stored in MongoDB.
 
@@ -84,7 +50,7 @@ export const createPayroll = async (req: Request, res: Response) => {
     if (!companyId) {
       return res.status(400).json({ success: false, message: 'Company ID not found' });
     }
-    const { month, year, employees, status } = req.body;
+    const { status } = req.body;
     // If creating a master payroll, ensure only one per company
     if (status === 'master') {
       const existingMaster = await Payroll.findOne({ companyId, status: 'master' });
