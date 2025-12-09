@@ -68,15 +68,9 @@ export const getIncomingEmails = async (req: Request, res: Response) => {
   try {
     res.set('Cache-Control', 'no-store');
     const { page = 1, limit = 50, isRead, isArchived = false } = req.query;
-    const userEmail = req.user?.email;
+    // Remove user filter for testing: get all emails
     const query: any = { isArchived: isArchived === 'true' };
     if (isRead !== undefined) query.isRead = isRead === 'true';
-    // Only show emails where user is in to, cc, or bcc
-    query.$or = [
-      { to: userEmail },
-      { cc: userEmail },
-      { bcc: userEmail }
-    ];
     const emails = await IncomingEmail.find(query)
       .sort({ receivedAt: -1 })
       .limit(Number(limit))
