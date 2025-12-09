@@ -72,6 +72,7 @@ export default function UsersPage() {
     phoneNumber: '',
     roles: [] as string[],
     departments: [] as string[],
+    isActive: true,
   });
 
   useEffect(() => {
@@ -229,6 +230,7 @@ export default function UsersPage() {
       phoneNumber: '',
       roles: [],
       departments: [],
+      isActive: true,
     });
   };
 
@@ -247,6 +249,7 @@ export default function UsersPage() {
       phoneNumber: user.phoneNumber || '',
       roles: user.roles,
       departments: user.departments,
+      isActive: user.isActive,
     });
     setEditingUser(user);
     setShowModal(true);
@@ -372,6 +375,17 @@ export default function UsersPage() {
                       className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={formData.isActive ? 'active' : 'suspended'}
+                    onChange={e => setFormData({ ...formData, isActive: e.target.value === 'active' })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                  >
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
                 </div>
 
                 <div>

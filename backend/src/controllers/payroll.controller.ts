@@ -1,4 +1,6 @@
+
 import { Request, Response } from 'express';
+import Payroll from '../models/Payroll';
 
 // Payroll submission interface
 interface PayrollEmployee {
@@ -36,8 +38,7 @@ interface PayrollSubmission {
   companyId: string;
 }
 
-// In-memory storage (replace with database in production)
-let payrollSubmissions: PayrollSubmission[] = [];
+// Remove in-memory storage. All payrolls are now stored in MongoDB.
 
 /**
  * Get all payroll submissions for a company
@@ -45,26 +46,14 @@ let payrollSubmissions: PayrollSubmission[] = [];
 export const getPayrolls = async (req: Request, res: Response) => {
   try {
     const companyId = req.user?.companyId;
-    
     if (!companyId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Company ID not found'
-      });
+      return res.status(400).json({ success: false, message: 'Company ID not found' });
     }
-
-    const companyPayrolls = payrollSubmissions.filter(p => p.companyId === companyId);
-
-    return res.status(200).json({
-      success: true,
-      payrolls: companyPayrolls
-    });
+    const payrolls = await Payroll.find({ companyId });
+    return res.status(200).json({ success: true, payrolls });
   } catch (error) {
     console.error('Error fetching payrolls:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error fetching payrolls'
-    });
+    return res.status(500).json({ success: false, message: 'Error fetching payrolls' });
   }
 };
 
@@ -75,26 +64,14 @@ export const getPayrollById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const companyId = req.user?.companyId;
-
-    const payroll = payrollSubmissions.find(p => p.id === id && p.companyId === companyId);
-
+    const payroll = await Payroll.findOne({ _id: id, companyId });
     if (!payroll) {
-      return res.status(404).json({
-        success: false,
-        message: 'Payroll not found'
-      });
+      return res.status(404).json({ success: false, message: 'Payroll not found' });
     }
-
-    return res.status(200).json({
-      success: true,
-      payroll
-    });
+    return res.status(200).json({ success: true, payroll });
   } catch (error) {
     console.error('Error fetching payroll:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error fetching payroll'
-    });
+    return res.status(500).json({ success: false, message: 'Error fetching payroll' });
   }
 };
 
@@ -104,35 +81,30 @@ export const getPayrollById = async (req: Request, res: Response) => {
 export const createPayroll = async (req: Request, res: Response) => {
   try {
     const companyId = (req.user as any)?.companyId;
-    const userId = (req.user as any)?.id;
-
     if (!companyId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Company ID not found'
-      });
+      return res.status(400).json({ success: false, message: 'Company ID not found' });
     }
-
-    const payrollData: PayrollSubmission = {
-      ...req.body,
-      companyId,
-      submittedBy: userId,
-      submittedAt: new Date().toISOString()
-    };
-
-    payrollSubmissions.push(payrollData);
-
-    return res.status(201).json({
-      success: true,
-      message: 'Payroll created successfully',
-      payroll: payrollData
-    });
+    const { month, year, employees, status } = req.body;
+    // If creating a master payroll, ensure only one per company
+    if (status === 'master') {
+      const existingMaster = await Payroll.findOne({ companyId, status: 'master' });
+      if (existingMaster) {
+        return res.status(400).json({ success: false, message: 'Master payroll already exists' });
+      }
+    }
+    // If creating a monthly payroll, copy from master if exists
+    let payrollData = req.body;
+    if (status !== 'master') {
+      const master = await Payroll.findOne({ companyId, status: 'master' });
+      if (master) {
+        payrollData.employees = master.employees;
+      }
+    }
+    const payroll = await Payroll.create({ ...payrollData, companyId });
+    return res.status(201).json({ success: true, message: 'Payroll created successfully', payroll });
   } catch (error) {
     console.error('Error creating payroll:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error creating payroll'
-    });
+    return res.status(500).json({ success: false, message: 'Error creating payroll' });
   }
 };
 
@@ -143,48 +115,19 @@ export const updatePayroll = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const companyId = req.user?.companyId;
-
-    const payrollIndex = payrollSubmissions.findIndex(
-      p => p.id === id && p.companyId === companyId
-    );
-
-    if (payrollIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Payroll not found'
-      });
+    const payroll = await Payroll.findOne({ _id: id, companyId });
+    if (!payroll) {
+      return res.status(404).json({ success: false, message: 'Payroll not found' });
     }
-
-    const currentPayroll = payrollSubmissions[payrollIndex];
-
-    // Only allow updates to draft payrolls
-    if (currentPayroll.status !== 'draft') {
-      return res.status(400).json({
-        success: false,
-        message: 'Only draft payrolls can be updated'
-      });
+    if (payroll.status !== 'draft') {
+      return res.status(400).json({ success: false, message: 'Only draft payrolls can be updated' });
     }
-
-    payrollSubmissions[payrollIndex] = {
-      ...currentPayroll,
-      ...req.body,
-      id: currentPayroll.id, // Preserve ID
-      companyId: currentPayroll.companyId, // Preserve company ID
-      submittedBy: currentPayroll.submittedBy, // Preserve submitter
-      submittedAt: currentPayroll.submittedAt // Preserve submission date
-    };
-
-    return res.status(200).json({
-      success: true,
-      message: 'Payroll updated successfully',
-      payroll: payrollSubmissions[payrollIndex]
-    });
+    Object.assign(payroll, req.body);
+    await payroll.save();
+    return res.status(200).json({ success: true, message: 'Payroll updated successfully', payroll });
   } catch (error) {
     console.error('Error updating payroll:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error updating payroll'
-    });
+    return res.status(500).json({ success: false, message: 'Error updating payroll' });
   }
 };
 
@@ -196,45 +139,21 @@ export const approvePayroll = async (req: Request, res: Response) => {
     const { id } = req.params;
     const companyId = (req.user as any)?.companyId;
     const userId = (req.user as any)?.id;
-
-    const payrollIndex = payrollSubmissions.findIndex(
-      p => p.id === id && p.companyId === companyId
-    );
-
-    if (payrollIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Payroll not found'
-      });
+    const payroll = await Payroll.findOne({ _id: id, companyId });
+    if (!payroll) {
+      return res.status(404).json({ success: false, message: 'Payroll not found' });
     }
-
-    const currentPayroll = payrollSubmissions[payrollIndex];
-
-    if (currentPayroll.status !== 'submitted') {
-      return res.status(400).json({
-        success: false,
-        message: 'Only submitted payrolls can be approved'
-      });
+    if (payroll.status !== 'submitted') {
+      return res.status(400).json({ success: false, message: 'Only submitted payrolls can be approved' });
     }
-
-    payrollSubmissions[payrollIndex] = {
-      ...currentPayroll,
-      status: 'approved',
-      approvedBy: userId,
-      approvedAt: new Date().toISOString()
-    };
-
-    return res.status(200).json({
-      success: true,
-      message: 'Payroll approved successfully',
-      payroll: payrollSubmissions[payrollIndex]
-    });
+    payroll.status = 'approved';
+    payroll.approvedBy = userId;
+    payroll.approvedAt = new Date();
+    await payroll.save();
+    return res.status(200).json({ success: true, message: 'Payroll approved successfully', payroll });
   } catch (error) {
     console.error('Error approving payroll:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error approving payroll'
-    });
+    return res.status(500).json({ success: false, message: 'Error approving payroll' });
   }
 };
 
@@ -247,53 +166,25 @@ export const rejectPayroll = async (req: Request, res: Response) => {
     const { reason } = req.body;
     const companyId = (req.user as any)?.companyId;
     const userId = (req.user as any)?.id;
-
     if (!reason) {
-      return res.status(400).json({
-        success: false,
-        message: 'Rejection reason is required'
-      });
+      return res.status(400).json({ success: false, message: 'Rejection reason is required' });
     }
-
-    const payrollIndex = payrollSubmissions.findIndex(
-      p => p.id === id && p.companyId === companyId
-    );
-
-    if (payrollIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Payroll not found'
-      });
+    const payroll = await Payroll.findOne({ _id: id, companyId });
+    if (!payroll) {
+      return res.status(404).json({ success: false, message: 'Payroll not found' });
     }
-
-    const currentPayroll = payrollSubmissions[payrollIndex];
-
-    if (currentPayroll.status !== 'submitted') {
-      return res.status(400).json({
-        success: false,
-        message: 'Only submitted payrolls can be rejected'
-      });
+    if (payroll.status !== 'submitted') {
+      return res.status(400).json({ success: false, message: 'Only submitted payrolls can be rejected' });
     }
-
-    payrollSubmissions[payrollIndex] = {
-      ...currentPayroll,
-      status: 'rejected',
-      rejectedBy: userId,
-      rejectedAt: new Date().toISOString(),
-      rejectionReason: reason
-    };
-
-    return res.status(200).json({
-      success: true,
-      message: 'Payroll rejected',
-      payroll: payrollSubmissions[payrollIndex]
-    });
+    payroll.status = 'rejected';
+    payroll.rejectedBy = userId;
+    payroll.rejectedAt = new Date();
+    payroll.rejectionReason = reason;
+    await payroll.save();
+    return res.status(200).json({ success: true, message: 'Payroll rejected', payroll });
   } catch (error) {
     console.error('Error rejecting payroll:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error rejecting payroll'
-    });
+    return res.status(500).json({ success: false, message: 'Error rejecting payroll' });
   }
 };
 
@@ -304,44 +195,20 @@ export const markPayrollAsPaid = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const companyId = req.user?.companyId;
-
-    const payrollIndex = payrollSubmissions.findIndex(
-      p => p.id === id && p.companyId === companyId
-    );
-
-    if (payrollIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Payroll not found'
-      });
+    const payroll = await Payroll.findOne({ _id: id, companyId });
+    if (!payroll) {
+      return res.status(404).json({ success: false, message: 'Payroll not found' });
     }
-
-    const currentPayroll = payrollSubmissions[payrollIndex];
-
-    if (currentPayroll.status !== 'approved') {
-      return res.status(400).json({
-        success: false,
-        message: 'Only approved payrolls can be marked as paid'
-      });
+    if (payroll.status !== 'approved') {
+      return res.status(400).json({ success: false, message: 'Only approved payrolls can be marked as paid' });
     }
-
-    payrollSubmissions[payrollIndex] = {
-      ...currentPayroll,
-      status: 'paid',
-      paidAt: new Date().toISOString()
-    };
-
-    return res.status(200).json({
-      success: true,
-      message: 'Payroll marked as paid',
-      payroll: payrollSubmissions[payrollIndex]
-    });
+    payroll.status = 'paid';
+    payroll.paidAt = new Date();
+    await payroll.save();
+    return res.status(200).json({ success: true, message: 'Payroll marked as paid', payroll });
   } catch (error) {
     console.error('Error marking payroll as paid:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error marking payroll as paid'
-    });
+    return res.status(500).json({ success: false, message: 'Error marking payroll as paid' });
   }
 };
 
@@ -352,38 +219,17 @@ export const deletePayroll = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const companyId = req.user?.companyId;
-
-    const payrollIndex = payrollSubmissions.findIndex(
-      p => p.id === id && p.companyId === companyId
-    );
-
-    if (payrollIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Payroll not found'
-      });
+    const payroll = await Payroll.findOne({ _id: id, companyId });
+    if (!payroll) {
+      return res.status(404).json({ success: false, message: 'Payroll not found' });
     }
-
-    const currentPayroll = payrollSubmissions[payrollIndex];
-
-    if (currentPayroll.status !== 'draft') {
-      return res.status(400).json({
-        success: false,
-        message: 'Only draft payrolls can be deleted'
-      });
+    if (payroll.status !== 'draft') {
+      return res.status(400).json({ success: false, message: 'Only draft payrolls can be deleted' });
     }
-
-    payrollSubmissions.splice(payrollIndex, 1);
-
-    return res.status(200).json({
-      success: true,
-      message: 'Payroll deleted successfully'
-    });
+    await Payroll.deleteOne({ _id: id, companyId });
+    return res.status(200).json({ success: true, message: 'Payroll deleted successfully' });
   } catch (error) {
     console.error('Error deleting payroll:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error deleting payroll'
-    });
+    return res.status(500).json({ success: false, message: 'Error deleting payroll' });
   }
 };

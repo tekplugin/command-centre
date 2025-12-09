@@ -27,25 +27,32 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
     try {
-      const token = localStorage.getItem('token');
-      const userData = localStorage.getItem('user');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
       if (userData) setUser(JSON.parse(userData));
+    } catch (e) {
+      setError('Failed to load user data.');
+      setLoading(false);
+      return;
+    }
+    try {
       const savedDeals = localStorage.getItem('sales_deals');
       if (savedDeals) setSalesDeals(JSON.parse(savedDeals));
+    } catch {}
+    try {
       const savedProjects = localStorage.getItem('projects');
       if (savedProjects) setProjects(JSON.parse(savedProjects));
+    } catch {}
+    try {
       const savedTickets = localStorage.getItem('tickets');
       if (savedTickets) setTickets(JSON.parse(savedTickets));
-      setLoading(false);
-    } catch (e: any) {
-      setError('Failed to load dashboard data.');
-      setLoading(false);
-    }
+    } catch {}
+    setLoading(false);
   }, [router]);
 
   if (loading) {

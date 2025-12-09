@@ -66,6 +66,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: '📊', roles: ['admin', 'executive'], department: null },
     { name: 'Mail', href: '/inbox', icon: '✉️', roles: ['admin', 'executive', 'manager', 'staff'], department: null },
+    { name: 'Projects', href: '/projects', icon: '📁', roles: ['admin', 'executive', 'project_manager'], department: null },
     { name: 'Users', href: '/users', icon: '👤', roles: ['admin'], department: null }, // Only admins
     // --- User management logic (scaffold) ---
     // Only global admin can create users, set/change passwords, and suspend users

@@ -310,55 +310,27 @@ export default function LegalPage() {
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">Legal Document Management</h1>
-              <p className="mt-1 text-sm text-gray-600">Manage all company legal documents, contracts, and certificates</p>
+              <p className="mt-1 text-sm text-gray-600">Manage internal company legal documents, contracts, and certificates</p>
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowCloseSaleModal(true)}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-              >
-                🎯 Close Sale
-              </button>
-              <button
                 onClick={() => setShowUploadModal(true)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'staff' 
-                    ? 'bg-green-600 hover:bg-green-700 text-white'
-                    : viewMode === 'client'
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-                }`}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium"
               >
-                + Upload {viewMode === 'staff' ? 'Staff' : viewMode === 'client' ? 'Client' : 'Internal'} Document
+                + Upload Internal Document
               </button>
             </div>
           </div>
 
           {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-600">Total Documents</div>
-              <div className="text-2xl font-bold text-gray-900 mt-1">{documentStats.total}</div>
+              <div className="text-sm text-gray-600">Total Internal Documents</div>
+              <div className="text-2xl font-bold text-gray-900 mt-1">{documentStats.internal}</div>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-600">Internal Docs</div>
-              <div className="text-2xl font-bold text-purple-600 mt-1">{documentStats.internal}</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-600">Client Docs</div>
-              <div className="text-2xl font-bold text-blue-600 mt-1">{documentStats.client}</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-600">Staff Docs</div>
-              <div className="text-2xl font-bold text-green-600 mt-1">{documentStats.staff}</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-600">Expiring Soon</div>
-              <div className="text-2xl font-bold text-orange-600 mt-1">{documentStats.expiringSoon}</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-600">Expired</div>
-              <div className="text-2xl font-bold text-red-600 mt-1">{documentStats.expired}</div>
+              <div className="text-sm text-gray-600">Active Docs</div>
+              <div className="text-2xl font-bold text-purple-600 mt-1">{documentStats.active}</div>
             </div>
           </div>
 
@@ -591,76 +563,22 @@ export default function LegalPage() {
             </div>
             <form onSubmit={handleUpload}>
               <div className="space-y-4">
-                {/* Document Title - Hidden for Staff Documents */}
-                {viewMode !== 'staff' && !uploadData.category.startsWith('Staff Document') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Document Title *</label>
-                    <input
-                      type="text"
-                      required={viewMode !== 'internal' && !uploadData.category.startsWith('Staff Document')}
-                      value={uploadData.title}
-                      onChange={(e) => setUploadData({...uploadData, title: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                      placeholder="e.g., CAC Certificate 2025"
-                    />
-                  </div>
-                )}
+                {/* Document Title for Internal Documents Only */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Document Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={uploadData.title}
+                    onChange={(e) => setUploadData({...uploadData, title: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    placeholder="e.g., CAC Certificate 2025"
+                  />
+                </div>
 
-                {/* Client Name - Only show for Client Documents */}
-                {viewMode === 'client' && !uploadData.category.startsWith('Staff Document') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Client/Customer Name (Optional)</label>
-                    <select
-                      value={uploadData.clientName}
-                      onChange={(e) => setUploadData({...uploadData, clientName: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                    >
-                      <option value="">Select client (optional)</option>
-                      {uniqueClients.length > 0 ? (
-                        uniqueClients.map(client => (
-                          <option key={client} value={client}>{client}</option>
-                        ))
-                      ) : (
-                        <option disabled>No clients available</option>
-                      )}
-                    </select>
-                    <p className="mt-1 text-xs text-gray-500">Select from existing clients or add new</p>
-                  </div>
-                )}
+                {/* Remove Client Name field for Legal */}
 
-                {/* Staff Document Fields - Only show if category is Staff Document */}
-                {uploadData.category.startsWith('Staff Document') && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
-                    <h3 className="text-sm font-semibold text-blue-900">📄 Staff Document Information</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-blue-900 mb-1">Employee Name *</label>
-                        <input
-                          type="text"
-                          required
-                          value={uploadData.employeeName}
-                          onChange={(e) => setUploadData({...uploadData, employeeName: e.target.value})}
-                          className="w-full px-3 py-2 border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                          placeholder="e.g., Chidi Okonkwo"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-blue-900 mb-1">Employee ID *</label>
-                        <input
-                          type="text"
-                          required
-                          value={uploadData.employeeId}
-                          onChange={(e) => setUploadData({...uploadData, employeeId: e.target.value})}
-                          className="w-full px-3 py-2 border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                          placeholder="e.g., EMP-001"
-                        />
-                      </div>
-                    </div>
-                    <p className="text-xs text-blue-700">
-                      ⚠️ These documents must be uploaded before the employee can be added to HR system
-                    </p>
-                  </div>
-                )}
+                {/* Remove Staff Document fields for Legal */}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -673,16 +591,7 @@ export default function LegalPage() {
                     >
                       <option value="">Select category</option>
                       {categories
-                        .filter(cat => {
-                          // Filter categories based on current view mode
-                          if (viewMode === 'staff') {
-                            return cat.startsWith('Staff Document');
-                          } else if (viewMode === 'client') {
-                            return !cat.startsWith('Staff Document');
-                          } else {
-                            return !cat.startsWith('Staff Document');
-                          }
-                        })
+                        .filter(cat => !cat.startsWith('Staff Document') && cat !== 'SLA (Service Level Agreement)' && cat !== 'Legal Agreement')
                         .map(cat => (
                           <option key={cat} value={cat}>{cat}</option>
                         ))}

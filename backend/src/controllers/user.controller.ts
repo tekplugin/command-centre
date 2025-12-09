@@ -45,19 +45,16 @@ export const getUserById = async (req: Request, res: Response): Promise<any> => 
  */
 export const createUser = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { email, password, firstName, lastName, roles, departments, phoneNumber } = req.body;
-    
+    const { email, password, firstName, lastName, roles, departments, phoneNumber, basicSalary, housingAllowance, transportAllowance, otherAllowances } = req.body;
     // Validate roles
     if (!roles || !Array.isArray(roles) || roles.length === 0) {
       return res.status(400).json({ message: 'At least one role is required' });
     }
-    
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'User with this email already exists' });
     }
-    
     // Create new user
     const user = await User.create({
       email,
@@ -70,10 +67,37 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
       phoneNumber,
       isActive: true
     });
-    
+    // Auto-add to master payroll and current month payroll
+    const Payroll = require('../models/Payroll').default;
+    const companyId = req.user?.companyId;
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    const employeeData = {
+      employeeId: user._id,
+      name: `${firstName} ${lastName}`,
+      department: departments?.[0] || '',
+      position: roles?.[0] || '',
+      basicSalary: basicSalary || 0,
+      housingAllowance: housingAllowance || 0,
+      transportAllowance: transportAllowance || 0,
+      otherAllowances: otherAllowances || 0,
+      startDate: now
+    };
+    // Add to master payroll
+    const masterPayroll = await Payroll.findOne({ companyId, status: 'master' });
+    if (masterPayroll) {
+      masterPayroll.employees.push(employeeData);
+      await masterPayroll.save();
+    }
+    // Add to current month payroll
+    const currentPayroll = await Payroll.findOne({ companyId, month, year });
+    if (currentPayroll) {
+      currentPayroll.employees.push(employeeData);
+      await currentPayroll.save();
+    }
     const userResponse = user.toObject();
     delete (userResponse as any).password;
-    
     res.status(201).json({
       success: true,
       message: 'User created successfully',

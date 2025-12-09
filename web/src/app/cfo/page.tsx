@@ -66,6 +66,9 @@ type AccountReceivable = {
 };
 
 export default function FinancePage() {
+          // State for metric breakdown modal
+          const [showMetricModal, setShowMetricModal] = useState(false);
+          const [activeMetric, setActiveMetric] = useState<string | null>(null);
         // Remaining modal and handler state
         const [showCashFlowModal, setShowCashFlowModal] = useState(false);
         const [showBudgetModal, setShowBudgetModal] = useState(false);
@@ -798,13 +801,15 @@ The invoice has been saved in the system.
           {/* Financial Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
             {financialMetrics.map((metric) => (
-              <div key={metric.label} className="bg-white rounded-lg shadow p-6">
+              <div
+                key={metric.label}
+                className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-xl transition-all"
+                onClick={() => { setActiveMetric(metric.label); setShowMetricModal(true); }}
+              >
                 <div className="text-sm font-medium text-gray-600">{metric.label}</div>
                 <div className="mt-2 flex items-baseline">
                   <div className="text-3xl font-bold text-gray-900">{metric.value}</div>
-                  <div className={`ml-2 text-sm font-semibold ${metric.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                    {metric.change}
-                  </div>
+                  <div className={`ml-2 text-sm font-semibold ${metric.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>{metric.change}</div>
                 </div>
                 {(metric as any).subtitle && (
                   <div className="text-xs text-gray-500 mt-1">{(metric as any).subtitle}</div>
@@ -812,6 +817,96 @@ The invoice has been saved in the system.
               </div>
             ))}
           </div>
+          {/* Metric Breakdown Modal */}
+          {showMetricModal && activeMetric && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+              <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6 relative">
+                <button
+                  className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+                  onClick={() => { setShowMetricModal(false); setActiveMetric(null); }}
+                >✖️</button>
+                <h2 className="text-xl font-semibold mb-4">{activeMetric} Breakdown</h2>
+                <div className="overflow-y-auto max-h-[60vh]">
+                  {activeMetric === 'Total Revenue' && (
+                    <table className="min-w-full text-sm">
+                      <thead><tr><th>Date</th><th>Amount</th><th>Source</th><th>Description</th></tr></thead>
+                      <tbody>
+                        {revenues.map((rev, i) => (
+                          <tr key={i}><td>{rev.date}</td><td>{formatCurrency(rev.amount)}</td><td>{rev.category || '-'}</td><td>{rev.description || '-'}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {activeMetric === 'Operating Costs' && (
+                    <table className="min-w-full text-sm">
+                      <thead><tr><th>Date</th><th>Amount</th><th>Category</th><th>Description</th></tr></thead>
+                      <tbody>
+                        {expenses.map((exp, i) => (
+                          <tr key={i}><td>{exp.date}</td><td>{formatCurrency(exp.amount)}</td><td>{exp.category || '-'}</td><td>{exp.description || '-'}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {activeMetric === 'Net Profit' && (
+                    <div>
+                      <h3 className="font-semibold mb-2">Revenue</h3>
+                      <table className="min-w-full text-sm mb-4">
+                        <thead><tr><th>Date</th><th>Amount</th><th>Source</th></tr></thead>
+                        <tbody>
+                          {revenues.map((rev, i) => (
+                            <tr key={i}><td>{rev.date}</td><td>{formatCurrency(rev.amount)}</td><td>{rev.category || '-'}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <h3 className="font-semibold mb-2">Expenses</h3>
+                      <table className="min-w-full text-sm">
+                        <thead><tr><th>Date</th><th>Amount</th><th>Category</th></tr></thead>
+                        <tbody>
+                          {expenses.map((exp, i) => (
+                            <tr key={i}><td>{exp.date}</td><td>{formatCurrency(exp.amount)}</td><td>{exp.category || '-'}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {activeMetric === 'Cash Flow' && (
+                    <table className="min-w-full text-sm">
+                      <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
+                      <tbody>
+                        {[...revenues, ...expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((item, i) => (
+                          <tr key={i}><td>{item.date}</td><td>{revenues.includes(item) ? 'Inflow' : 'Outflow'}</td><td>{formatCurrency(item.amount)}</td><td>{item.description || '-'}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {activeMetric === 'Total Assets' && (
+                    <table className="min-w-full text-sm">
+                      <thead><tr><th>Name</th><th>Value</th><th>Quantity</th><th>Purchase Price</th></tr></thead>
+                      <tbody>
+                        {assets.map((asset, i) => (
+                          <tr key={i}><td>{asset.name || '-'}</td><td>{formatCurrency(asset.currentValue)}</td><td>{asset.quantity}</td><td>{formatCurrency(asset.purchasePrice)}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {activeMetric === 'Total Equity' && (
+                    <div>
+                      <div className="mb-2">Cash: <span className="font-semibold">{formatCurrency(currentBalance)}</span></div>
+                      <h3 className="font-semibold mb-2">Assets</h3>
+                      <table className="min-w-full text-sm">
+                        <thead><tr><th>Name</th><th>Value</th><th>Quantity</th></tr></thead>
+                        <tbody>
+                          {assets.map((asset, i) => (
+                            <tr key={i}><td>{asset.name || '-'}</td><td>{formatCurrency(asset.currentValue)}</td><td>{asset.quantity}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Invoices Section - Removed, now accessible via Accounts Receivable */}
 

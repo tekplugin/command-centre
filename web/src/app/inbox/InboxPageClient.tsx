@@ -25,6 +25,7 @@ interface Email {
     filename: string;
     contentType: string;
     size: number;
+    url?: string;
   }>;
 }
 
@@ -57,9 +58,9 @@ export default function MailPageClient() {
   // Custom folders/labels
   const [folders, setFolders] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
-      return JSON.parse(localStorage.getItem('mailFolders') || '["Inbox","Archive","Spam"]');
+      return JSON.parse(localStorage.getItem('mailFolders') || '["Inbox","Sent","Archive","Spam"]');
     }
-    return ["Inbox","Archive","Spam"];
+    return ["Inbox","Sent","Archive","Spam"];
   });
   const [selectedFolder, setSelectedFolder] = useState('Inbox');
   const [labels, setLabels] = useState<string[]>(() => {
@@ -235,7 +236,7 @@ export default function MailPageClient() {
       bcc: '',
       subject: selectedEmail.subject.startsWith('Fwd:') ? selectedEmail.subject : `Fwd: ${selectedEmail.subject}`,
       body: `\n\n--- Forwarded Message ---\n${selectedEmail.textBody}`,
-      attachments: selectedEmail.attachments ? [...selectedEmail.attachments] : [],
+      attachments: [], // Only allow manual file selection for new attachments
     });
     setShowComposeModal(true);
   };
@@ -478,12 +479,13 @@ export default function MailPageClient() {
               {/* Top Bar */}
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                 <div className="flex items-center gap-2">
+                  {/* Only one compose button in header, remove duplicate */}
                   <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition-all duration-150 flex items-center gap-2" onClick={() => setShowComposeModal(true)}><FaRegEdit /> Compose</button>
                   <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg shadow transition-all duration-150 flex items-center gap-2" onClick={fetchEmails}><FaBell /> Refresh</button>
                 </div>
                 <div className="flex items-center gap-2">
                   <FaSearch className="text-gray-400" />
-                  <input type="text" className="border border-gray-300 rounded-lg p-2 w-full max-w-xs focus:ring-2 focus:ring-blue-200 transition-all duration-150" placeholder="Search mail..." value={search} onChange={e => setSearch(e.target.value)} />
+                  <input type="text" className="border border-gray-300 rounded-lg p-2 w-full max-w-xs focus:ring-2 focus:ring-blue-200 transition-all duration-150 bg-white text-gray-900 placeholder-gray-500" placeholder="Search mail..." value={search} onChange={e => setSearch(e.target.value)} />
                   <label className="flex items-center gap-1 ml-2 text-sm text-gray-600 cursor-pointer">
                     <input type="checkbox" checked={showStarredOnly} onChange={e => setShowStarredOnly(e.target.checked)} className="accent-yellow-500" />
                     <FaStar className="text-yellow-500" /> Starred
@@ -523,8 +525,8 @@ export default function MailPageClient() {
                         <span className="ml-2 text-xs text-gray-500">({threadEmails.length})</span>
                       </header>
                       {threadEmails.map((email) => (
-                        <div key={email._id} onClick={() => viewEmail(email)} className={`flex items-start justify-between p-4 hover:bg-blue-100 cursor-pointer transition-all duration-150 ${!email.isRead ? 'bg-blue-50' : ''}`}>
-                          <div className="flex-1 min-w-0 flex gap-3 items-center">
+                        <div key={email._id} className={`flex items-start justify-between p-4 hover:bg-blue-100 cursor-pointer transition-all duration-150 ${!email.isRead ? 'bg-blue-50' : ''}`}>
+                          <div className="flex-1 min-w-0 flex gap-3 items-center" onClick={() => viewEmail(email)}>
                             <input type="checkbox" checked={selectedIds.includes(email._id)} onChange={e => { e.stopPropagation(); toggleSelect(email._id); }} className="accent-blue-500" />
                             <button onClick={e => { e.stopPropagation(); toggleStar(email._id); }} className="text-yellow-500 text-lg focus:outline-none" title={starredIds.includes(email._id) ? 'Unstar' : 'Star'}>{starredIds.includes(email._id) ? <FaStar /> : <FaRegStar />}</button>
                             <FaUserCircle className="text-2xl text-gray-400" />
@@ -536,9 +538,10 @@ export default function MailPageClient() {
                               </div>
                             </div>
                           </div>
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end gap-2">
                             <span className="text-xs text-gray-400">{formatDate(email.receivedAt)}</span>
-                            <button onClick={e => { e.stopPropagation(); toggleArchive(email._id, email.isArchived); }} className={`mt-2 px-2 py-1 rounded text-xs font-medium flex items-center gap-1 ${email.isArchived ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-800'} transition-all duration-150`}>{email.isArchived ? <FaArchive /> : <FaArchive />} {email.isArchived ? 'Unarchive' : 'Archive'}</button>
+                            <button onClick={e => { e.stopPropagation(); toggleArchive(email._id, email.isArchived); }} className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 ${email.isArchived ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-800'} transition-all duration-150`}>{email.isArchived ? <FaArchive /> : <FaArchive />} {email.isArchived ? 'Unarchive' : 'Archive'}</button>
+                            <button onClick={e => { e.stopPropagation(); deleteEmail(email._id); }} className="px-2 py-1 rounded text-xs font-medium flex items-center gap-1 bg-red-100 text-red-700 hover:bg-red-200 transition-all duration-150" title="Delete"><FaTrash /> Delete</button>
                           </div>
                         </div>
                       ))}
@@ -665,7 +668,7 @@ export default function MailPageClient() {
                   <label className="block text-sm font-medium text-gray-700">To</label>
                   <input
                     type="text"
-                    className="mt-1 block w-full border border-gray-300 rounded-md p-2"
+                    className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-white text-gray-900 placeholder-gray-500 bg-white text-gray-900 placeholder-gray-500 bg-white text-gray-900 placeholder-gray-500"
                     value={composeData.to}
                     onChange={e => setComposeData({ ...composeData, to: e.target.value })}
                     required
@@ -677,7 +680,7 @@ export default function MailPageClient() {
                     <label className="block text-sm font-medium text-gray-700">CC</label>
                     <input
                       type="text"
-                      className="mt-1 block w-full border border-gray-300 rounded-md p-2"
+                      className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-white text-gray-900 placeholder-gray-500 bg-white text-gray-900 placeholder-gray-500"
                       value={composeData.cc}
                       onChange={e => setComposeData({ ...composeData, cc: e.target.value })}
                       placeholder="cc@example.com, ..."
@@ -687,7 +690,7 @@ export default function MailPageClient() {
                     <label className="block text-sm font-medium text-gray-700">BCC</label>
                     <input
                       type="text"
-                      className="mt-1 block w-full border border-gray-300 rounded-md p-2"
+                      className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-white text-gray-900 placeholder-gray-500 bg-white text-gray-900 placeholder-gray-500"
                       value={composeData.bcc}
                       onChange={e => setComposeData({ ...composeData, bcc: e.target.value })}
                       placeholder="bcc@example.com, ..."
@@ -698,7 +701,7 @@ export default function MailPageClient() {
                   <label className="block text-sm font-medium text-gray-700">Subject</label>
                   <input
                     type="text"
-                    className="mt-1 block w-full border border-gray-300 rounded-md p-2"
+                    className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-white text-gray-900 placeholder-gray-500 bg-white text-gray-900 placeholder-gray-500"
                     value={composeData.subject}
                     onChange={e => setComposeData({ ...composeData, subject: e.target.value })}
                     required
@@ -721,12 +724,12 @@ export default function MailPageClient() {
                 {/* Schedule Send */}
                 <div className="mb-2">
                   <label className="block text-sm font-medium text-gray-700">Send later</label>
-                  <input type="datetime-local" value={scheduleDate || ''} onChange={e => setScheduleDate(e.target.value)} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+                  <input type="datetime-local" value={scheduleDate || ''} onChange={e => setScheduleDate(e.target.value)} className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-white text-gray-900 placeholder-gray-500 bg-white text-gray-900 placeholder-gray-500" />
                 </div>
                 {/* Signature Editor */}
                 <div className="mb-2">
                   <label className="block text-sm font-medium text-gray-700">Signature</label>
-                  <textarea className="mt-1 block w-full border border-gray-300 rounded-md p-2" rows={2} value={signature} onChange={e => { setSignature(e.target.value); localStorage.setItem('mailSignature', e.target.value); }} />
+                  <textarea className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-white text-gray-900 placeholder-gray-500 bg-white text-gray-900 placeholder-gray-500" rows={2} value={signature} onChange={e => { setSignature(e.target.value); localStorage.setItem('mailSignature', e.target.value); }} />
                 </div>
                 {/* Drafts List */}
                 <div className="mb-2">
