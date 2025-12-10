@@ -358,36 +358,13 @@ export default function LegalPage() {
           </div>
 
           {/* View Mode Toggle */}
+          {/* Only show internal documents, remove staff and client toggles */}
           <div className="mb-6 flex gap-4">
             <button
-              onClick={() => setViewMode('internal')}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                viewMode === 'internal'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className="px-6 py-3 rounded-lg font-medium bg-purple-600 text-white"
+              disabled
             >
               📄 Internal Documents ({documentStats.internal})
-            </button>
-            <button
-              onClick={() => setViewMode('client')}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                viewMode === 'client'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              🤝 Client Documents ({documentStats.client})
-            </button>
-            <button
-              onClick={() => setViewMode('staff')}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                viewMode === 'staff'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              👥 Staff Documents ({documentStats.staff})
             </button>
           </div>
 
@@ -551,14 +528,10 @@ export default function LegalPage() {
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative z-[10000]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-4">
               <h2 className="text-xl font-semibold text-gray-900">
-                Upload {viewMode === 'staff' ? '👥 Staff' : viewMode === 'client' ? '🤝 Client' : '📄 Internal'} Document
+                Upload 📄 Internal Document
               </h2>
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                viewMode === 'staff' ? 'bg-green-100 text-green-800' :
-                viewMode === 'client' ? 'bg-blue-100 text-blue-800' :
-                'bg-purple-100 text-purple-800'
-              }`}>
-                {viewMode === 'staff' ? 'Staff' : viewMode === 'client' ? 'Client' : 'Internal'}
+              <span className="text-xs px-2 py-1 rounded-full font-medium bg-purple-100 text-purple-800">
+                Internal
               </span>
             </div>
             <form onSubmit={handleUpload}>

@@ -89,10 +89,11 @@ export default function MailPageClient() {
     });
   };
 
+
   useEffect(() => {
     fetchEmails();
     // eslint-disable-next-line
-  }, [filter]);
+  }, [filter, selectedFolder]);
 
   const fetchEmails = async () => {
     try {
@@ -101,10 +102,21 @@ export default function MailPageClient() {
       const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
       let url = `${apiUrl}/email/inbox`;
-      if (filter === 'unread') {
-        url += '?isRead=false';
-      } else if (filter === 'archived') {
+      if (selectedFolder === 'Inbox') {
+        if (filter === 'unread') {
+          url += '?isRead=false';
+        } else if (filter === 'archived') {
+          url += '?isArchived=true';
+        }
+      } else if (selectedFolder === 'Sent') {
+        url = `${apiUrl}/email/sent`;
+      } else if (selectedFolder === 'Archive') {
         url += '?isArchived=true';
+      } else if (selectedFolder === 'Spam') {
+        url += '?spam=true';
+      } else {
+        // Custom folder
+        url += `?folder=${encodeURIComponent(selectedFolder)}`;
       }
       const response = await fetch(url, {
         headers: {
@@ -114,7 +126,6 @@ export default function MailPageClient() {
       });
       if (response.ok) {
         const result = await response.json();
-        // Show all emails for debugging
         setEmails(result.data || []);
       } else {
         console.error('Failed to fetch emails');
@@ -423,20 +434,6 @@ export default function MailPageClient() {
                 {unreadCount > 0 ? `${unreadCount} unread message${unreadCount !== 1 ? 's' : ''}` : 'All caught up!'}
               </p>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowComposeModal(true)}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow transition-all duration-150 flex items-center gap-2"
-              >
-                <FaRegEdit /> Compose
-              </button>
-              <button
-                onClick={fetchEmails}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg shadow transition-all duration-150 flex items-center gap-2"
-              >
-                <FaBell /> Refresh
-              </button>
-            </div>
           </div>
 
           {/* Folder/Label Sidebar */}
@@ -478,11 +475,7 @@ export default function MailPageClient() {
             <main className="flex-1 flex flex-col gap-4 animate-fade-in">
               {/* Top Bar */}
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  {/* Only one compose button in header, remove duplicate */}
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition-all duration-150 flex items-center gap-2" onClick={() => setShowComposeModal(true)}><FaRegEdit /> Compose</button>
-                  <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg shadow transition-all duration-150 flex items-center gap-2" onClick={fetchEmails}><FaBell /> Refresh</button>
-                </div>
+                {/* Removed duplicate compose and refresh buttons */}
                 <div className="flex items-center gap-2">
                   <FaSearch className="text-gray-400" />
                   <input type="text" className="border border-gray-300 rounded-lg p-2 w-full max-w-xs focus:ring-2 focus:ring-blue-200 transition-all duration-150 bg-white text-gray-900 placeholder-gray-500" placeholder="Search mail..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -571,7 +564,13 @@ export default function MailPageClient() {
                 )}
                 <div><span className="font-medium">Date:</span> {formatDate(selectedEmail.receivedAt)}</div>
               </div>
-              <div className="mb-4 text-gray-900 whitespace-pre-wrap border-t pt-2">{selectedEmail.textBody}</div>
+              <div className="mb-4 text-gray-900 whitespace-pre-wrap border-t pt-2">
+                {selectedEmail.htmlBody ? (
+                  <div dangerouslySetInnerHTML={{ __html: selectedEmail.htmlBody }} />
+                ) : (
+                  selectedEmail.textBody
+                )}
+              </div>
               {/* Attachment Preview/Download */}
               {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
                 <div className="mb-2">

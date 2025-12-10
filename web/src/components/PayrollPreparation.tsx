@@ -230,13 +230,15 @@ export default function PayrollPreparation({ onClose, onSubmit, existingPayroll 
             </div>
           </div>
 
-          {/* Add Employee Button */}
-          <button
-            onClick={() => setShowAddEmployee(true)}
-            className="w-full mb-4 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-          >
-            + Add Employee to Payroll
-          </button>
+          {/* Add Employee Button: Only show if creating new payroll */}
+          {!existingPayroll && (
+            <button
+              onClick={() => setShowAddEmployee(true)}
+              className="w-full mb-4 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+            >
+              + Add Employee to Payroll
+            </button>
+          )}
 
           {/* Employees List */}
           {employees.length > 0 && (
@@ -284,8 +286,8 @@ export default function PayrollPreparation({ onClose, onSubmit, existingPayroll 
             </div>
           )}
 
-          {/* Add Employee Form */}
-          {showAddEmployee && (
+          {/* Add Employee Form: Only show if creating new payroll */}
+          {showAddEmployee && !existingPayroll && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
                 <h3 className="text-xl font-bold text-gray-900 mb-4">Add Employee</h3>
